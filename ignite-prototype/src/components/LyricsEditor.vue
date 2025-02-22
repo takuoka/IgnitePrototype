@@ -3,7 +3,11 @@ import { ref } from 'vue'
 
 const lyrics = ref('')
 
-defineExpose({ lyrics })
+defineExpose({
+  lyrics: {
+    get: () => lyrics.value
+  }
+})
 </script>
 
 <template>
@@ -12,6 +16,7 @@ defineExpose({ lyrics })
       v-model="lyrics"
       placeholder="ここに歌詞を書いてください..."
       class="editor-textarea"
+      spellcheck="false"
     ></textarea>
   </div>
 </template>
@@ -19,25 +24,30 @@ defineExpose({ lyrics })
 <style scoped>
 .lyrics-editor {
   height: 100%;
-  padding: 1rem;
+  padding: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
 .editor-textarea {
   width: 100%;
   height: 100%;
-  min-height: 500px;
-  padding: 1rem;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 1.5rem;
+  font-size: 1.2rem;
+  line-height: 1.8;
+  color: #ffffff;
+  background-color: transparent;
+  border: none;
+  border-radius: 8px;
   resize: none;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.editor-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .editor-textarea:focus {
   outline: none;
-  border-color: #4a9eff;
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.05);
 }
 </style>

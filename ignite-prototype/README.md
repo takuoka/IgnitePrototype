@@ -1,33 +1,48 @@
-# ignite-prototype
+# Ignite Prototype - 歌詞エディタ
 
-This template should help get you started developing with Vue 3 in Vite.
+歌詞を書くためのWebベースエディタのプロトタイプです。AIからのインスピレーションを受けながら、創造的な歌詞作成をサポートします。
 
-## Recommended IDE Setup
+## 機能
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- 左ペイン (70%): 歌詞エディタ
+  - シンプルで使いやすいテキストエリア
+  - リアルタイムな状態管理
 
-## Type Support for `.vue` Imports in TS
+- 右ペイン (30%): AIインスピレーション
+  - Markdown形式でのアイデア表示
+  - 「更新」ボタンでAIからの新しいアイデアを取得
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+## 技術スタック
 
-## Customize configuration
+- フロントエンド: Vue 3 + TypeScript
+- スタイリング: カスタムCSS（ダークモード）
+- Markdown: marked.js
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## セットアップ
 
-## Project Setup
-
-```sh
+```bash
+# 依存関係のインストール
 npm install
-```
 
-### Compile and Hot-Reload for Development
-
-```sh
+# 開発サーバーの起動
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+## 環境変数
 
-```sh
-npm run build
+バックエンドAPIを使用する場合は、`.env`ファイルを作成し、以下の変数を設定してください：
+
+```env
+VITE_API_ENDPOINT=http://your-api-endpoint
 ```
+
+## バックエンド連携
+
+現在はモックAPIを使用していますが、実際のバックエンドAPIに接続する場合は、`src/components/InspirationPanel.vue`の`fetchDefyMock`関数を実際のAPI呼び出しに置き換えてください。
+
+## 今後の拡張予定
+
+- 実際のDefy APIとの連携
+- 追加機能（韻を踏む、国語力UP等）のボタン
+- 歌詞の保存＆シェア機能
+- レスポンシブデザインの強化
