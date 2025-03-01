@@ -10,235 +10,317 @@ import type {
 import { logError } from '@/utils/errorHandler'
 
 /**
- * 最終結果かどうかを判定する関数
- * @param eventData - イベントデータ
- * @returns 最終結果かどうか
+ * Dify API イベントハンドラークラス
+ * ストリーミングイベントの処理を担当
  */
-const isFinalResult = (eventData: StreamingEventData): boolean => {
-  // workflow_finishedイベントは最終結果を示す
-  if (eventData.event === 'workflow_finished') {
-    console.log('🏁 [DifyAPI] workflow_finishedイベント検出 - 最終結果として処理します')
-    return true
-  }
-  
-  // node_finishedイベントで、node_typeがendの場合も最終結果と見なす
-  if (eventData.event === 'node_finished' && eventData.data?.node_type === 'end') {
-    console.log('🏁 [DifyAPI] 最終ノード(end)完了イベント検出 - 最終結果として処理します')
-    return true
-  }
-  
-  // node_finishedイベントで、node_typeがllmの場合も最終結果と見なす
-  if (eventData.event === 'node_finished' && eventData.data?.node_type === 'llm') {
-    console.log('🏁 [DifyAPI] LLMノード完了イベント検出 - 最終結果として処理します')
-    return true
-  }
-  
-  return false
-}
+class DifyEventHandler {
+  private accumulatedText: string = '';
+  private lastContent: string = '';
+  private onChunkCallback: (chunk: string, isFinal?: boolean) => void;
 
-/**
- * 最終結果のテキストを抽出する関数
- * @param eventData - イベントデータ
- * @returns 最終結果のテキスト、または null
- */
-const extractFinalResult = (eventData: StreamingEventData): string | null => {
-  // node_finishedイベントでnode_typeがllmの場合（優先度高）
-  if (eventData.event === 'node_finished' && eventData.data?.node_type === 'llm') {
-    // outputs.textを確認
-    if (eventData.data?.outputs?.text) {
-      console.log('🏁 [DifyAPI] LLMノード.outputs.text検出')
-      return eventData.data.outputs.text
+  constructor(callback: (chunk: string, isFinal?: boolean) => void) {
+    this.onChunkCallback = callback;
+  }
+
+  /**
+   * イベントデータを処理する
+   * @param eventData - イベントデータ
+   */
+  processEvent(eventData: StreamingEventData): void {
+    // 無視すべきイベントをスキップ
+    if (this.shouldSkipEvent(eventData)) {
+      return;
+    }
+
+    // イベントタイプに基づいて処理
+    switch (eventData.event) {
+      case 'text_chunk':
+        this.handleTextChunkEvent(eventData as TextChunkEvent);
+        break;
+      case 'node_finished':
+        this.handleNodeFinishedEvent(eventData as NodeFinishedEvent);
+        break;
+      case 'workflow_finished':
+        this.handleWorkflowFinishedEvent(eventData as WorkflowFinishedEvent);
+        break;
+      default:
+        this.handleGenericEvent(eventData);
+        break;
     }
   }
-  
-  // node_finishedイベントでnode_typeがendの場合
-  if (eventData.event === 'node_finished' && eventData.data?.node_type === 'end') {
+
+  /**
+   * ストリーム終了時の処理
+   */
+  handleStreamEnd(): void {
+    // ストリーム終了時に累積テキストがあれば、最終結果として送信
+    if (this.accumulatedText && this.accumulatedText !== this.lastContent && this.accumulatedText.trim()) {
+      console.log(`🏁 [DifyAPI] ストリーム終了時の累積テキストを最終結果として送信: ${this.getPreview(this.accumulatedText)}`);
+      this.sendChunk(this.accumulatedText, true);
+    }
+  }
+
+  /**
+   * テキストチャンクイベントの処理
+   * @param event - テキストチャンクイベント
+   */
+  private handleTextChunkEvent(event: TextChunkEvent): void {
+    const text = event.data.text;
+    
+    if (text && text.trim()) {
+      console.log(`✨ [DifyAPI] text_chunkイベント検出: ${text}`);
+      
+      // "stop"文字列をチェック
+      if (text.trim().toLowerCase() === 'stop') {
+        console.log(`⚠️ [DifyAPI] "stop"文字列を検出したためスキップ`);
+        return;
+      }
+      
+      // テキストを累積
+      this.accumulatedText += text;
+      console.log(`📝 [DifyAPI] テキスト累積: ${this.getPreview(this.accumulatedText)}`);
+      
+      // チャンクを送信
+      this.sendChunk(text);
+    }
+  }
+
+  /**
+   * ノード完了イベントの処理
+   * @param event - ノード完了イベント
+   */
+  private handleNodeFinishedEvent(event: NodeFinishedEvent): void {
+    console.log(`🔄 [DifyAPI] node_finishedイベント検出: ${event.data.node_type} - ${event.data.title}`);
+    
+    // LLMノード完了の場合は特別処理
+    if (event.data.node_type === 'llm') {
+      this.handleLLMNodeFinished(event);
+      return;
+    }
+    
+    // 最終ノード(end)の場合
+    if (event.data.node_type === 'end') {
+      this.handleEndNodeFinished(event);
+      return;
+    }
+    
+    // その他のノード完了イベント
+    if (event.data.outputs) {
+      this.extractAndSendContent(event.data.outputs);
+    }
+  }
+
+  /**
+   * LLMノード完了イベントの特別処理
+   * @param event - ノード完了イベント
+   */
+  private handleLLMNodeFinished(event: NodeFinishedEvent): void {
+    console.log('🔍 [DifyAPI] LLMノード完了イベント詳細:');
+    console.log('🔍 [DifyAPI] node_id:', event.data.node_id);
+    console.log('🔍 [DifyAPI] title:', event.data.title);
+    
+    if (event.data.outputs) {
+      console.log('🔍 [DifyAPI] outputs keys:', Object.keys(event.data.outputs));
+      
+      // outputsの内容をログ出力
+      for (const [key, value] of Object.entries(event.data.outputs)) {
+        if (typeof value === 'string') {
+          console.log(`🔍 [DifyAPI] outputs.${key}: ${this.getPreview(value)}`);
+        } else if (value !== null && typeof value === 'object') {
+          console.log(`🔍 [DifyAPI] outputs.${key}: [Object]`);
+        } else {
+          console.log(`🔍 [DifyAPI] outputs.${key}:`, value);
+        }
+      }
+      
+      // 特に重要なtext出力を処理
+      if (event.data.outputs.text && typeof event.data.outputs.text === 'string') {
+        console.log(`🔍 [DifyAPI] outputs.text の完全な内容:`);
+        console.log(event.data.outputs.text);
+        
+        // 最終結果として直接送信
+        console.log(`🏁 [DifyAPI] LLMノードの最終結果を直接送信します (isFinal=true)`);
+        this.sendChunk(event.data.outputs.text, true);
+        
+        // 累積テキストをリセット
+        this.accumulatedText = '';
+      }
+    }
+  }
+
+  /**
+   * 終了ノード完了イベントの処理
+   * @param event - ノード完了イベント
+   */
+  private handleEndNodeFinished(event: NodeFinishedEvent): void {
     // outputs.resultを確認
-    if (eventData.data?.outputs?.result) {
-      console.log('🏁 [DifyAPI] endノード.outputs.result検出')
-      return eventData.data.outputs.result
+    if (event.data.outputs?.result && typeof event.data.outputs.result === 'string') {
+      console.log(`🏁 [DifyAPI] endノード.outputs.result検出: ${this.getPreview(event.data.outputs.result)}`);
+      this.sendChunk(event.data.outputs.result, true);
+      this.accumulatedText = '';
+      return;
     }
     
     // inputs.resultを確認
-    if (eventData.data?.inputs?.result) {
-      console.log('🏁 [DifyAPI] endノード.inputs.result検出')
-      return eventData.data.inputs.result
-    }
-  }
-  
-  // workflow_finishedイベントの場合
-  if (eventData.event === 'workflow_finished') {
-    if (eventData.data?.outputs?.result) {
-      console.log('🏁 [DifyAPI] workflow_finished.outputs.result検出')
-      return eventData.data.outputs.result
-    }
-  }
-  
-  // その他のnode_finishedイベントの場合
-  if (eventData.event === 'node_finished') {
-    // outputs.resultを確認
-    if (eventData.data?.outputs?.result) {
-      console.log('🏁 [DifyAPI] node_finished.outputs.result検出')
-      return eventData.data.outputs.result
+    if (event.data.inputs?.result && typeof event.data.inputs.result === 'string') {
+      console.log(`🏁 [DifyAPI] endノード.inputs.result検出: ${this.getPreview(event.data.inputs.result)}`);
+      this.sendChunk(event.data.inputs.result, true);
+      this.accumulatedText = '';
+      return;
     }
     
-    // inputs.resultを確認
-    if (eventData.data?.inputs?.result) {
-      console.log('🏁 [DifyAPI] node_finished.inputs.result検出')
-      return eventData.data.inputs.result
-    }
-    
-    // outputs.textを確認
-    if (eventData.data?.outputs?.text) {
-      console.log('🏁 [DifyAPI] node_finished.outputs.text検出')
-      return eventData.data.outputs.text
+    // 累積テキストがあれば送信
+    if (this.accumulatedText) {
+      console.log(`🏁 [DifyAPI] 最終結果として累積テキストを送信: ${this.getPreview(this.accumulatedText)}`);
+      this.sendChunk(this.accumulatedText, true);
+      this.accumulatedText = '';
     }
   }
-  
-  return null
-}
 
-/**
- * 無視すべきデータかどうかを判定する関数
- * @param key - キー
- * @param value - 値
- * @returns 無視すべきデータかどうか
- */
-const shouldIgnoreData = (key: string, value: any): boolean => {
-  // 最終結果を示す可能性のあるキー
-  const resultKeys = ['result', 'text', 'answer', 'content'];
-  
-  // 最終結果を示すキーの場合はスキップしない
-  if (resultKeys.some(resultKey => key === resultKey || key.endsWith(`.${resultKey}`))) {
+  /**
+   * ワークフロー完了イベントの処理
+   * @param event - ワークフロー完了イベント
+   */
+  private handleWorkflowFinishedEvent(event: WorkflowFinishedEvent): void {
+    console.log('🏁 [DifyAPI] workflow_finishedイベント検出');
+    
+    // outputsから結果を抽出
+    if (event.data?.outputs) {
+      for (const [key, value] of Object.entries(event.data.outputs)) {
+        if (typeof value === 'string' && value.trim() && !this.shouldIgnoreData(key, value)) {
+          console.log(`✨ [DifyAPI] workflow_finished.outputs.${key}検出: ${this.getPreview(value)}`);
+          this.sendChunk(value, true);
+          this.accumulatedText = '';
+          return;
+        }
+      }
+    }
+    
+    // 累積テキストがあれば送信
+    if (this.accumulatedText) {
+      console.log(`🏁 [DifyAPI] 最終結果として累積テキストを送信: ${this.getPreview(this.accumulatedText)}`);
+      this.sendChunk(this.accumulatedText, true);
+      this.accumulatedText = '';
+    }
+  }
+
+  /**
+   * その他の一般的なイベントの処理
+   * @param eventData - イベントデータ
+   */
+  private handleGenericEvent(eventData: StreamingEventData): void {
+    // 一般的なフィールドをチェック
+    const dataFields = ['text', 'result', 'answer', 'content'];
+    
+    for (const field of dataFields) {
+      const value = eventData.data?.[field];
+      if (typeof value === 'string' && value.trim() && !this.shouldIgnoreData(field, value)) {
+        console.log(`✨ [DifyAPI] data.${field}検出: ${this.getPreview(value)}`);
+        this.sendChunk(value);
+        return;
+      }
+    }
+  }
+
+  /**
+   * オブジェクトから有効なコンテンツを抽出して送信
+   * @param obj - 検査対象オブジェクト
+   */
+  private extractAndSendContent(obj: Record<string, any>): void {
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string' && value.trim() && !this.shouldIgnoreData(key, value)) {
+        console.log(`✨ [DifyAPI] ${key}検出: ${this.getPreview(value)}`);
+        this.sendChunk(value);
+        return;
+      }
+    }
+  }
+
+  /**
+   * チャンクを送信する
+   * @param content - 送信するコンテンツ
+   * @param isFinal - 最終結果かどうか
+   */
+  private sendChunk(content: string, isFinal: boolean = false): void {
+    // 重複チェック - 前回と同じ内容なら送信しない
+    if (content === this.lastContent || !content.trim()) {
+      console.log(`⏭️ [DifyAPI] 重複または空のチャンクをスキップ`);
+      return;
+    }
+    
+    console.log(`📤 [DifyAPI] チャンク送信: ${this.getPreview(content)} ${isFinal ? '(最終結果)' : ''}`);
+    this.lastContent = content;
+    this.onChunkCallback(content, isFinal);
+  }
+
+  /**
+   * イベントをスキップすべきかどうかを判定
+   * @param eventData - イベントデータ
+   * @returns スキップすべきかどうか
+   */
+  private shouldSkipEvent(eventData: StreamingEventData): boolean {
+    // workflow_startedイベントは常にスキップ（入力データを含むため）
+    if (eventData.event === 'workflow_started') {
+      console.log('⏭️ [DifyAPI] workflow_startedイベントをスキップ（入力データを含む）');
+      return true;
+    }
+    
+    // node_startedイベントもスキップ（通常は出力データを含まない）
+    if (eventData.event === 'node_started') {
+      console.log('⏭️ [DifyAPI] node_startedイベントをスキップ');
+      return true;
+    }
+    
     return false;
   }
-  
-  // 入力データを示す可能性のあるキー
-  const inputKeys = ['currentLyric', 'sys.'];
-  
-  // キーが入力データを示す場合
-  if (inputKeys.some(inputKey => key.includes(inputKey))) {
-    console.log(`⚠️ [DifyAPI] 入力データと判断してスキップ: ${key}`)
-    return true;
-  }
-  
-  // inputsキーは特別扱い - result以外はスキップ
-  if (key.includes('inputs') && !key.endsWith('.result')) {
-    console.log(`⚠️ [DifyAPI] 入力データと判断してスキップ: ${key}`)
-    return true;
-  }
-  
-  // "stop"という文字列は無視
-  if (typeof value === 'string' && value.trim().toLowerCase() === 'stop') {
-    console.log(`⚠️ [DifyAPI] "stop"文字列をスキップ`)
-    return true;
-  }
-  
-  return false;
-}
 
-/**
- * イベントデータを処理する関数
- * @param eventData - イベントデータ
- * @param lastContent - 前回の内容
- * @param onChunk - チャンク処理コールバック
- * @returns 処理結果（テキストと最終フラグ）
- */
-const processEventData = (
-  eventData: StreamingEventData,
-  lastContent: string,
-  onChunk: (chunk: string, isFinal?: boolean) => void
-): { processed: boolean, content?: string } => {
-  // workflow_startedイベントは常にスキップ（入力データを含むため）
-  if (eventData.event === 'workflow_started') {
-    console.log('⏭️ [DifyAPI] workflow_startedイベントをスキップ（入力データを含む）')
-    return { processed: false }
-  }
-  
-  // node_startedイベントもスキップ（通常は出力データを含まない）
-  if (eventData.event === 'node_started') {
-    console.log('⏭️ [DifyAPI] node_startedイベントをスキップ')
-    return { processed: false }
-  }
-  
-  // イベントタイプに基づいて処理
-  switch (eventData.event) {
-    case 'text_chunk': {
-      // text_chunkイベントの場合、data.textフィールドからテキストを抽出
-      const textChunkEvent = eventData as TextChunkEvent
-      const text = textChunkEvent.data.text
-      
-      if (text && text.trim()) {
-        console.log(`✨ [DifyAPI] text_chunkイベント検出: ${text}`)
-        return { processed: true, content: text }
-      }
-      break
+  /**
+   * 無視すべきデータかどうかを判定
+   * @param key - キー
+   * @param value - 値
+   * @returns 無視すべきデータかどうか
+   */
+  private shouldIgnoreData(key: string, value: any): boolean {
+    // 最終結果を示す可能性のあるキー
+    const resultKeys = ['result', 'text', 'answer', 'content'];
+    
+    // 最終結果を示すキーの場合はスキップしない
+    if (resultKeys.some(resultKey => key === resultKey || key.endsWith(`.${resultKey}`))) {
+      return false;
     }
     
-    case 'workflow_finished': {
-      // workflow_finishedイベントの場合、最終結果としてマーク
-      const workflowFinishedEvent = eventData as WorkflowFinishedEvent
-      console.log('🏁 [DifyAPI] workflow_finishedイベント検出')
-      
-      // outputsから結果を抽出（入力データをフィルタリング）
-      if (workflowFinishedEvent.data?.outputs) {
-        const outputs = workflowFinishedEvent.data.outputs
-        for (const [key, value] of Object.entries(outputs)) {
-          if (typeof value === 'string' && value.trim() && !shouldIgnoreData(key, value)) {
-            console.log(`✨ [DifyAPI] workflow_finished.outputs.${key}検出: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`)
-            return { processed: true, content: value }
-          }
-        }
-      }
-      break
+    // 入力データを示す可能性のあるキー
+    const inputKeys = ['currentLyric', 'sys.'];
+    
+    // キーが入力データを示す場合
+    if (inputKeys.some(inputKey => key.includes(inputKey))) {
+      console.log(`⚠️ [DifyAPI] 入力データと判断してスキップ: ${key}`);
+      return true;
     }
     
-    case 'node_finished': {
-      // node_finishedイベントの場合、outputsから結果を抽出（入力データをフィルタリング）
-      const nodeFinishedEvent = eventData as NodeFinishedEvent
-      console.log(`🔄 [DifyAPI] node_finishedイベント検出: ${nodeFinishedEvent.data.node_type} - ${nodeFinishedEvent.data.title}`)
-      
-      if (nodeFinishedEvent.data.outputs) {
-        const outputs = nodeFinishedEvent.data.outputs
-        for (const [key, value] of Object.entries(outputs)) {
-          if (typeof value === 'string' && value.trim() && !shouldIgnoreData(key, value)) {
-            console.log(`✨ [DifyAPI] node_finished.outputs.${key}検出: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`)
-            return { processed: true, content: value }
-          }
-        }
-      }
-      break
+    // inputsキーは特別扱い - result以外はスキップ
+    if (key.includes('inputs') && !key.endsWith('.result')) {
+      console.log(`⚠️ [DifyAPI] 入力データと判断してスキップ: ${key}`);
+      return true;
     }
     
-    default: {
-      // その他のイベントタイプの場合、一般的なフィールドをチェック（入力データをフィルタリング）
-      if (eventData.data?.text && typeof eventData.data.text === 'string' && 
-          eventData.data.text.trim() && !shouldIgnoreData('text', eventData.data.text)) {
-        console.log(`✨ [DifyAPI] data.text検出: ${eventData.data.text.substring(0, 50)}${eventData.data.text.length > 50 ? '...' : ''}`)
-        return { processed: true, content: eventData.data.text }
-      }
-      
-      if (eventData.data?.result && typeof eventData.data.result === 'string' && 
-          eventData.data.result.trim() && !shouldIgnoreData('result', eventData.data.result)) {
-        console.log(`✨ [DifyAPI] data.result検出: ${eventData.data.result.substring(0, 50)}${eventData.data.result.length > 50 ? '...' : ''}`)
-        return { processed: true, content: eventData.data.result }
-      }
-      
-      if (eventData.data?.answer && typeof eventData.data.answer === 'string' && 
-          eventData.data.answer.trim() && !shouldIgnoreData('answer', eventData.data.answer)) {
-        console.log(`✨ [DifyAPI] data.answer検出: ${eventData.data.answer.substring(0, 50)}${eventData.data.answer.length > 50 ? '...' : ''}`)
-        return { processed: true, content: eventData.data.answer }
-      }
-      
-      if (eventData.data?.content && typeof eventData.data.content === 'string' && 
-          eventData.data.content.trim() && !shouldIgnoreData('content', eventData.data.content)) {
-        console.log(`✨ [DifyAPI] data.content検出: ${eventData.data.content.substring(0, 50)}${eventData.data.content.length > 50 ? '...' : ''}`)
-        return { processed: true, content: eventData.data.content }
-      }
+    // "stop"という文字列は無視
+    if (typeof value === 'string' && value.trim().toLowerCase() === 'stop') {
+      console.log(`⚠️ [DifyAPI] "stop"文字列をスキップ`);
+      return true;
     }
+    
+    return false;
   }
-  
-  return { processed: false }
+
+  /**
+   * テキストのプレビューを取得（長いテキストを省略表示）
+   * @param text - テキスト
+   * @returns プレビューテキスト
+   */
+  private getPreview(text: string): string {
+    return `${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`;
+  }
 }
 
 /**
@@ -250,15 +332,15 @@ export const fetchDifyInspirationStream = async (
   lyrics: string,
   onChunk: (chunk: string, isFinal?: boolean) => void
 ): Promise<void> => {
-  console.log('🚀 [DifyAPI] ストリーミングAPI呼び出し開始')
-  console.log('📝 [DifyAPI] 入力歌詞:', lyrics.substring(0, 100) + (lyrics.length > 100 ? '...' : ''))
+  console.log('🚀 [DifyAPI] ストリーミングAPI呼び出し開始');
+  console.log('📝 [DifyAPI] 入力歌詞:', lyrics.substring(0, 100) + (lyrics.length > 100 ? '...' : ''));
   
-  const apiUrl = `${import.meta.env.VITE_DIFY_API_BASE_URL}/workflows/run`
-  const apiKey = import.meta.env.VITE_DIFY_API_KEY
+  const apiUrl = `${import.meta.env.VITE_DIFY_API_BASE_URL}/workflows/run`;
+  const apiKey = import.meta.env.VITE_DIFY_API_KEY;
   
   if (!apiUrl || !apiKey) {
-    console.error('❌ [DifyAPI] API設定不足: 環境変数が設定されていません')
-    throw new Error('API configuration missing. Check environment variables.')
+    console.error('❌ [DifyAPI] API設定不足: 環境変数が設定されていません');
+    throw new Error('API configuration missing. Check environment variables.');
   }
   
   const requestBody: DifyAPIRequest = {
@@ -267,11 +349,11 @@ export const fetchDifyInspirationStream = async (
     },
     response_mode: 'streaming',
     user: 'user-' + Date.now()
-  }
+  };
   
   try {
     // APIリクエスト送信
-    console.log('📤 [DifyAPI] リクエスト送信:', JSON.stringify(requestBody, null, 2))
+    console.log('📤 [DifyAPI] リクエスト送信:', JSON.stringify(requestBody, null, 2));
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -279,197 +361,78 @@ export const fetchDifyInspirationStream = async (
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(requestBody)
-    })
+    });
     
-    console.log(`🔄 [DifyAPI] レスポンスステータス: ${response.status} ${response.statusText}`)
+    console.log(`🔄 [DifyAPI] レスポンスステータス: ${response.status} ${response.statusText}`);
     
     // エラーチェック
     if (!response.ok) {
-      console.error(`❌ [DifyAPI] APIエラー: ${response.status} ${response.statusText}`)
-      const errorData = await response.json()
-      console.error('❌ [DifyAPI] エラー詳細:', errorData)
-      throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`)
+      console.error(`❌ [DifyAPI] APIエラー: ${response.status} ${response.statusText}`);
+      const errorData = await response.json();
+      console.error('❌ [DifyAPI] エラー詳細:', errorData);
+      throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
     
     // ストリーム処理開始
-    console.log('📥 [DifyAPI] ストリーミング開始')
-    const reader = response.body?.getReader()
+    console.log('📥 [DifyAPI] ストリーミング開始');
+    const reader = response.body?.getReader();
     if (!reader) {
-      throw new Error('Readable stream is not supported in this environment.')
+      throw new Error('Readable stream is not supported in this environment.');
     }
     
-    const decoder = new TextDecoder('utf-8')
-    let buffer = ''
-    let chunkCount = 0
-    let lastContent = ''
-    let accumulatedText = ''
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let chunkCount = 0;
+    
+    // イベントハンドラーの初期化
+    const eventHandler = new DifyEventHandler(onChunk);
     
     // ストリーミングデータを逐次読み取る
     while (true) {
-      const { done, value } = await reader.read()
+      const { done, value } = await reader.read();
       
       if (done) {
-        console.log('✅ [DifyAPI] ストリーミング完了')
-        
-        // ストリーム終了時に累積テキストがあれば、最終結果として送信
-        if (accumulatedText && accumulatedText !== lastContent && accumulatedText.trim()) {
-          console.log(`🏁 [DifyAPI] ストリーム終了時の累積テキストを最終結果として送信: ${accumulatedText.substring(0, 50)}${accumulatedText.length > 50 ? '...' : ''}`)
-          onChunk(accumulatedText, true)
-        }
-        
-        break
+        console.log('✅ [DifyAPI] ストリーミング完了');
+        eventHandler.handleStreamEnd();
+        break;
       }
       
       // バイナリデータをテキストにデコード
-      const chunk = decoder.decode(value, { stream: true })
-      buffer += chunk
-      console.log(`📦 [DifyAPI] バイナリチャンク受信 #${++chunkCount}: ${value.length} bytes`)
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+      console.log(`📦 [DifyAPI] バイナリチャンク受信 #${++chunkCount}: ${value.length} bytes`);
       
       // イベントは "\n\n" で区切られる
-      const parts = buffer.split('\n\n')
-      buffer = parts.pop() || ''
-      console.log(`🔍 [DifyAPI] イベント分割: ${parts.length}個のイベント検出`)
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+      console.log(`🔍 [DifyAPI] イベント分割: ${parts.length}個のイベント検出`);
       
       // 各イベントを処理
       for (const part of parts) {
         // "data:" 行のみ抽出
-        const lines = part.split('\n').filter(line => line.startsWith('data:'))
+        const lines = part.split('\n').filter(line => line.startsWith('data:'));
         
         for (const line of lines) {
-          const jsonStr = line.slice(5).trim() // "data:" を除去
-          console.log(`📄 [DifyAPI] SSEデータ受信: ${jsonStr.substring(0, 100)}${jsonStr.length > 100 ? '...' : ''}`)
+          const jsonStr = line.slice(5).trim(); // "data:" を除去
+          console.log(`📄 [DifyAPI] SSEデータ受信: ${jsonStr.substring(0, 100)}${jsonStr.length > 100 ? '...' : ''}`);
           
           try {
             // JSONパース
-            const eventData = JSON.parse(jsonStr) as StreamingEventData
-            console.log('🔄 [DifyAPI] イベントタイプ:', eventData.event || 'unknown')
+            const eventData = JSON.parse(jsonStr) as StreamingEventData;
+            console.log('🔄 [DifyAPI] イベントタイプ:', eventData.event || 'unknown');
             
-            // LLMノード完了イベントの場合、詳細をログ出力
-            if (eventData.event === 'node_finished' && eventData.data?.node_type === 'llm') {
-              console.log('🔍 [DifyAPI] LLMノード完了イベント詳細:')
-              console.log('🔍 [DifyAPI] node_id:', eventData.data.node_id)
-              console.log('🔍 [DifyAPI] title:', eventData.data.title)
-              
-              if (eventData.data.outputs) {
-                console.log('🔍 [DifyAPI] outputs keys:', Object.keys(eventData.data.outputs))
-                
-                // outputsの内容を詳細にログ出力
-                for (const [key, value] of Object.entries(eventData.data.outputs)) {
-                  if (typeof value === 'string') {
-                    console.log(`🔍 [DifyAPI] outputs.${key}: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`)
-                  } else if (value !== null && typeof value === 'object') {
-                    console.log(`🔍 [DifyAPI] outputs.${key}: [Object]`)
-                  } else {
-                    console.log(`🔍 [DifyAPI] outputs.${key}:`, value)
-                  }
-                }
-                
-                // 特に重要なtext出力を詳細にログ出力
-                if (eventData.data.outputs.text) {
-                  console.log(`🔍 [DifyAPI] outputs.text の完全な内容:`)
-                  console.log(eventData.data.outputs.text)
-                  
-                  // 最終結果として直接送信
-                  console.log(`🏁 [DifyAPI] LLMノードの最終結果を直接送信します (isFinal=true)`)
-                  lastContent = eventData.data.outputs.text
-                  onChunk(eventData.data.outputs.text, true)
-                  
-                  // 累積テキストをリセット
-                  accumulatedText = ''
-                  continue
-                }
-              }
-            }
-            
-            // イベントデータを処理
-            const { processed, content } = processEventData(eventData, lastContent, onChunk)
-            
-            if (processed && content) {
-              // "stop"文字列をチェック
-              if (typeof content === 'string' && content.trim().toLowerCase() === 'stop') {
-                console.log(`⚠️ [DifyAPI] "stop"文字列を検出したためスキップ`)
-                continue
-              }
-              
-              // 最終結果かどうかをチェック
-              const final = isFinalResult(eventData)
-              console.log(`🔄 [DifyAPI] 最終結果フラグ: ${final ? 'true' : 'false'} (${eventData.event})`)
-              
-              // 最終結果の場合
-              if (final) {
-                // 最終結果のテキストを抽出
-                const finalResult = extractFinalResult(eventData)
-                
-                if (finalResult) {
-                  console.log(`🏁 [DifyAPI] 最終結果を検出: ${finalResult.substring(0, 50)}${finalResult.length > 50 ? '...' : ''}`)
-                  console.log(`🏁 [DifyAPI] 最終結果の長さ: ${finalResult.length} 文字`)
-                  
-                  // 最終結果を送信
-                  if (finalResult !== lastContent && finalResult.trim()) {
-                    console.log(`🏁 [DifyAPI] 最終結果を送信します (isFinal=true)`)
-                    lastContent = finalResult
-                    onChunk(finalResult, true)
-                  } else {
-                    console.log(`⚠️ [DifyAPI] 最終結果が前回と同じか空のためスキップ`)
-                  }
-                  
-                  // 累積テキストをリセット
-                  accumulatedText = ''
-                  continue
-                } else if (accumulatedText) {
-                  // 最終結果が抽出できなかった場合は、累積テキストを最終結果として送信
-                  console.log(`🏁 [DifyAPI] 最終結果として累積テキストを送信: ${accumulatedText.substring(0, 50)}${accumulatedText.length > 50 ? '...' : ''}`)
-                  console.log(`🏁 [DifyAPI] 累積テキストの長さ: ${accumulatedText.length} 文字`)
-                  
-                  // 最終結果として累積テキストを送信
-                  if (accumulatedText !== lastContent && accumulatedText.trim()) {
-                    console.log(`🏁 [DifyAPI] 累積テキストを最終結果として送信します (isFinal=true)`)
-                    lastContent = accumulatedText
-                    onChunk(accumulatedText, true)
-                  } else {
-                    console.log(`⚠️ [DifyAPI] 累積テキストが前回と同じか空のためスキップ`)
-                  }
-                  
-                  // 累積テキストをリセット
-                  accumulatedText = ''
-                  continue
-                } else {
-                  console.log(`⚠️ [DifyAPI] 最終結果も累積テキストも見つかりませんでした`)
-                }
-              }
-              
-              // text_chunkイベントの場合は累積
-              if (eventData.event === 'text_chunk') {
-                accumulatedText += content
-                console.log(`📝 [DifyAPI] テキスト累積: ${accumulatedText.substring(0, 50)}${accumulatedText.length > 50 ? '...' : ''}`)
-                
-                // 重複チェック - 前回と同じ内容なら送信しない
-                if (content !== lastContent && content.trim()) {
-                  console.log(`📤 [DifyAPI] チャンク送信: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''} ${final ? '(最終結果)' : ''}`)
-                  lastContent = content
-                  onChunk(content, final)
-                } else {
-                  console.log(`⏭️ [DifyAPI] 重複または空のチャンクをスキップ`)
-                }
-              } else {
-                // その他のイベントの場合は直接送信
-                if (content !== lastContent && content.trim()) {
-                  console.log(`📤 [DifyAPI] 完全なコンテンツ送信: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''} ${final ? '(最終結果)' : ''}`)
-                  lastContent = content
-                  onChunk(content, final)
-                }
-              }
-            }
+            // イベント処理
+            eventHandler.processEvent(eventData);
           } catch (error) {
-            console.error('❌ [DifyAPI] JSONパースエラー:', error)
-            console.error('❌ [DifyAPI] 問題のJSONデータ:', jsonStr)
+            console.error('❌ [DifyAPI] JSONパースエラー:', error);
+            console.error('❌ [DifyAPI] 問題のJSONデータ:', jsonStr);
           }
         }
       }
     }
   } catch (error) {
-    console.error('❌ [DifyAPI] ストリーミングエラー:', error)
-    logError('DifyAPI', error)
-    throw error
+    console.error('❌ [DifyAPI] ストリーミングエラー:', error);
+    logError('DifyAPI', error);
+    throw error;
   }
-}
+};
