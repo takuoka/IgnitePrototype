@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { marked } from 'marked'
-import { fetchDifyInspirationStream } from '@/services/api/dify'
+import { fetchDifyInspirationStream } from '@/services/api/difyService'
 import { createApiErrorMessage, logError } from '@/utils/errorHandler'
 
 // State
