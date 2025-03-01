@@ -21,3 +21,23 @@ export interface DifyAPIRequest {
   response_mode: string
   user: string
 }
+
+/**
+ * ストリーミングイベントデータの型定義
+ */
+export interface StreamingEventData {
+  event?: string
+  data?: {
+    status?: string
+    outputs?: Record<string, any>
+    output?: Record<string, any>
+    result?: string
+    answer?: string
+    text?: string
+    content?: string
+    [key: string]: any
+  }
+  result?: string
+  answer?: string
+  [key: string]: any
+}

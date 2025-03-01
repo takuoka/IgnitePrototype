@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { marked } from 'marked'
-import { fetchDifyInspiration, fetchDifyInspirationStream } from '@/services/api/difyService'
+import { fetchDifyInspirationStream } from '@/services/api/difyService'
 import { createApiErrorMessage, logError } from '@/utils/errorHandler'
 
 // State
 const inspirationText = ref('AIのインスピレーションがここに表示されます')
 const isLoading = ref(false)
 const hasError = ref(false)
-const useStreaming = ref(true) // ストリーミングモードを使用するかどうか
 
 // Props and emits
 const props = defineProps<{
@@ -23,7 +22,6 @@ const emit = defineEmits(['update'])
 const updateInspiration = async () => {
   try {
     console.log('🔄 [InspirationPanel] インスピレーション更新開始')
-    console.log(`🔍 [InspirationPanel] モード: ${useStreaming.value ? 'ストリーミング' : 'ブロッキング'}`)
     console.log('📝 [InspirationPanel] 歌詞:', props.lyrics?.substring(0, 100) + (props.lyrics && props.lyrics.length > 100 ? '...' : ''))
     
     isLoading.value = true
@@ -32,45 +30,32 @@ const updateInspiration = async () => {
     emit('update')
     console.log('🔄 [InspirationPanel] 初期状態更新')
     
-    if (useStreaming.value) {
-      // ストリーミングモードでAPI呼び出し
-      console.log('🚀 [InspirationPanel] ストリーミングAPI呼び出し開始')
-      let chunkCount = 0
+    // ストリーミングモードでAPI呼び出し
+    console.log('🚀 [InspirationPanel] ストリーミングAPI呼び出し開始')
+    let chunkCount = 0
+    
+    await fetchDifyInspirationStream(props.lyrics || '', (chunk: string, isFinal?: boolean) => {
+      chunkCount++
+      console.log(`📦 [InspirationPanel] チャンク #${chunkCount} 受信: ${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''} ${isFinal ? '(最終結果)' : ''}`)
       
-      // ストリーミング開始時に内容をリセット
-      inspirationText.value = '## 生成中...\n\n'
+      // 最終結果の場合は、内容を置き換える
+      if (isFinal) {
+        console.log('🔄 [InspirationPanel] 最終結果を受信 - 内容を置き換えます')
+        inspirationText.value = chunk
+      }
+      // 最初のチャンクが来たら「生成中...」を消去
+      else if (chunkCount === 1) {
+        inspirationText.value = chunk
+      } else {
+        inspirationText.value += chunk
+      }
       
-      await fetchDifyInspirationStream(props.lyrics || '', (chunk: string, isFinal?: boolean) => {
-        chunkCount++
-        console.log(`📦 [InspirationPanel] チャンク #${chunkCount} 受信: ${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''} ${isFinal ? '(最終結果)' : ''}`)
-        
-        // 最終結果の場合は、内容を置き換える
-        if (isFinal) {
-          console.log('🔄 [InspirationPanel] 最終結果を受信 - 内容を置き換えます')
-          inspirationText.value = chunk
-        }
-        // 最初のチャンクが来たら「生成中...」を消去
-        else if (chunkCount === 1) {
-          inspirationText.value = chunk
-        } else {
-          inspirationText.value += chunk
-        }
-        
-        console.log(`📊 [InspirationPanel] テキスト合計長: ${inspirationText.value.length} 文字`)
-        emit('update')
-        console.log('🔄 [InspirationPanel] UI更新イベント発行')
-      })
-      
-      console.log(`✅ [InspirationPanel] ストリーミング完了 (${chunkCount} チャンク受信)`)
-    } else {
-      // ブロッキングモードでAPI呼び出し
-      console.log('🚀 [InspirationPanel] ブロッキングAPI呼び出し開始')
-      const output = await fetchDifyInspiration(props.lyrics || '')
-      console.log(`📦 [InspirationPanel] レスポンス受信: ${output.substring(0, 100)}${output.length > 100 ? '...' : ''}`)
-      inspirationText.value = output
-      console.log('🔄 [InspirationPanel] テキスト更新完了')
+      console.log(`📊 [InspirationPanel] テキスト合計長: ${inspirationText.value.length} 文字`)
       emit('update')
-    }
+      console.log('🔄 [InspirationPanel] UI更新イベント発行')
+    })
+    
+    console.log(`✅ [InspirationPanel] ストリーミング完了 (${chunkCount} チャンク受信)`)
     
     console.log('✅ [InspirationPanel] インスピレーション更新完了')
   } catch (error) {
@@ -105,16 +90,6 @@ const renderedMarkdown = computed(() => {
       >
         {{ isLoading ? '生成中...' : '更新' }}
       </button>
-      <div class="mode-toggle">
-        <label class="toggle-label">
-          <input 
-            type="checkbox" 
-            v-model="useStreaming"
-            :disabled="isLoading"
-          />
-          ストリーミングモード
-        </label>
-      </div>
     </div>
   </div>
 </template>
@@ -149,22 +124,5 @@ const renderedMarkdown = computed(() => {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
-}
-
-.mode-toggle {
-  display: flex;
-  align-items: center;
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  font-size: 0.9rem;
-}
-
-.toggle-label input {
-  margin-right: 0.5rem;
 }
 </style>
