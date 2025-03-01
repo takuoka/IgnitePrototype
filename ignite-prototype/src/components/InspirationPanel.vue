@@ -36,7 +36,15 @@ const updateInspiration = async () => {
     
     isLoading.value = true
     hasError.value = false
-    inspirationText.value = '## 生成中...\n\n'
+    
+    // 既存のテキストを保持
+    const currentText = inspirationText.value
+    
+    // 生成中の表示を追加
+    inspirationText.value = currentText === 'AIのインスピレーションがここに表示されます'
+      ? '## 生成中...\n\n'
+      : currentText + '\n\n---\n\n## 生成中...\n\n'
+    
     renderedHtml.value = marked.parse(inspirationText.value) as string
     emit('update')
     console.log('🔄 [InspirationPanel] 初期状態更新')
@@ -56,7 +64,13 @@ const updateInspiration = async () => {
       const result = markdownRenderer.processChunk(chunk, !!isFinal)
       
       // テキストと描画結果を更新
-      inspirationText.value = result.text
+      if (currentText === 'AIのインスピレーションがここに表示されます') {
+        // 初回の場合は置き換え
+        inspirationText.value = result.text
+      } else {
+        // 2回目以降は追加
+        inspirationText.value = currentText + '\n\n---\n\n' + result.text
+      }
       
       // ストリーミングマーカーを置換してクラスを追加
       let html = result.html
@@ -67,7 +81,14 @@ const updateInspiration = async () => {
         )
       }
       
-      renderedHtml.value = html
+      // renderedHtmlも初回と2回目以降で処理を分ける
+      if (currentText === 'AIのインスピレーションがここに表示されます') {
+        // 初回の場合は置き換え
+        renderedHtml.value = html
+      } else {
+        // 2回目以降は、マークダウンを再レンダリングして全体を表示
+        renderedHtml.value = marked.parse(inspirationText.value) as string
+      }
       
       console.log(`📊 [InspirationPanel] テキスト合計長: ${inspirationText.value.length} 文字`)
       emit('update')
