@@ -89,35 +89,53 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
     accumulatedText: string,
     lastContent: string
   ): EventHandlerResult {
-    const sections = [];
+    let handled = false;
+    let newLastContent = lastContent;
     
+    // 各セクションを個別に送信
     if (outputs.advice && typeof outputs.advice === 'string' && (outputs.advice.trim() || outputs.advice.includes('\n'))) {
-      sections.push(`## アドバイス\n\n${outputs.advice}`);
+      const adviceChunk = JSON.stringify({
+        type: 'advice',
+        content: outputs.advice
+      });
+      
+      const sent = this.sendChunk(adviceChunk, true, onChunk, newLastContent);
+      if (sent) {
+        newLastContent = adviceChunk;
+        handled = true;
+      }
     }
     
     if (outputs.phrases && typeof outputs.phrases === 'string' && (outputs.phrases.trim() || outputs.phrases.includes('\n'))) {
-      sections.push(`## フレーズ\n\n${outputs.phrases}`);
+      const phrasesChunk = JSON.stringify({
+        type: 'phrases',
+        content: outputs.phrases
+      });
+      
+      const sent = this.sendChunk(phrasesChunk, true, onChunk, newLastContent);
+      if (sent) {
+        newLastContent = phrasesChunk;
+        handled = true;
+      }
     }
     
     if (outputs.words && typeof outputs.words === 'string' && (outputs.words.trim() || outputs.words.includes('\n'))) {
-      sections.push(`## キーワード\n\n${outputs.words}`);
-    }
-    
-    if (sections.length > 0) {
-      const combinedContent = sections.join('\n\n');
-      const sent = this.sendChunk(combinedContent, true, onChunk, lastContent);
+      const wordsChunk = JSON.stringify({
+        type: 'words',
+        content: outputs.words
+      });
       
-      return {
-        accumulatedText: '',
-        lastContent: sent ? combinedContent : lastContent,
-        handled: true
-      };
+      const sent = this.sendChunk(wordsChunk, true, onChunk, newLastContent);
+      if (sent) {
+        newLastContent = wordsChunk;
+        handled = true;
+      }
     }
     
     return {
-      accumulatedText,
-      lastContent,
-      handled: true
+      accumulatedText: '',
+      lastContent: newLastContent,
+      handled: handled
     };
   }
   
@@ -138,11 +156,16 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
     for (const [key, value] of Object.entries(outputs)) {
       // 改行のみのテキストも処理するように条件を変更
       if (typeof value === 'string' && (value.trim() || value.includes('\n')) && !this.contentFilter.shouldIgnoreData(key, value)) {
-        const sent = this.sendChunk(value, true, onChunk, lastContent);
+        const legacyChunk = JSON.stringify({
+          type: 'legacy',
+          content: value
+        });
+        
+        const sent = this.sendChunk(legacyChunk, true, onChunk, lastContent);
         
         return {
           accumulatedText: '',
-          lastContent: sent ? value : lastContent,
+          lastContent: sent ? legacyChunk : lastContent,
           handled: true
         };
       }
