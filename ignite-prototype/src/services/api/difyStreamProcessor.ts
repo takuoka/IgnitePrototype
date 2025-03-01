@@ -72,7 +72,8 @@ export class DifyStreamProcessor implements StreamProcessor {
         
         if (done) {
           // 最後に累積テキストがあれば送信
-          if (accumulatedText && accumulatedText !== lastContent && accumulatedText.trim()) {
+          // 改行のみのテキストも処理するように条件を変更
+          if (accumulatedText && accumulatedText !== lastContent && (accumulatedText.trim() || accumulatedText.includes('\n'))) {
             if (this.debug) {
               console.log(`🏁 [DifyStreamProcessor] ストリーム終了時の累積テキストを最終結果として送信`);
             }
@@ -113,20 +114,23 @@ export class DifyStreamProcessor implements StreamProcessor {
               // イベント処理の結果を更新
               if (eventData.event === 'text_chunk' && (eventData as TextChunkEvent).data?.text) {
                 const text = (eventData as TextChunkEvent).data.text;
-                if (text && text.trim() && text.trim().toLowerCase() !== 'stop') {
+                // 改行のみのチャンクも処理するように条件を変更
+                if (text && (text.trim() || text.includes('\n')) && text.trim().toLowerCase() !== 'stop') {
                   accumulatedText += text;
                   lastContent = text;
                 }
               } else if (eventData.event === 'node_finished' && (eventData as NodeFinishedEvent).data?.outputs?.text) {
                 const text = (eventData as NodeFinishedEvent).data.outputs.text;
-                if (text && text.trim()) {
+                // 改行のみのテキストも処理するように条件を変更
+                if (text && (text.trim() || text.includes('\n'))) {
                   lastContent = text;
                   accumulatedText = '';
                 }
               } else if (eventData.event === 'workflow_finished' && (eventData as WorkflowFinishedEvent).data?.outputs) {
                 // outputsから結果を抽出
                 for (const [key, value] of Object.entries((eventData as WorkflowFinishedEvent).data.outputs)) {
-                  if (typeof value === 'string' && value.trim() && !this.shouldIgnoreData(key, value)) {
+                  // 改行のみのテキストも処理するように条件を変更
+                  if (typeof value === 'string' && (value.trim() || value.includes('\n')) && !this.shouldIgnoreData(key, value)) {
                     lastContent = value;
                     accumulatedText = '';
                     break;
@@ -162,18 +166,21 @@ export class DifyStreamProcessor implements StreamProcessor {
   ): void {
     if (eventData.event === 'text_chunk' && (eventData as TextChunkEvent).data?.text) {
       const text = (eventData as TextChunkEvent).data.text;
-      if (text && text.trim() && text.trim().toLowerCase() !== 'stop') {
+      // 改行のみのチャンクも処理するように条件を変更
+      if (text && (text.trim() || text.includes('\n')) && text.trim().toLowerCase() !== 'stop') {
         this.sendChunk(text, false, onChunk, lastContent);
       }
     } else if (eventData.event === 'node_finished' && (eventData as NodeFinishedEvent).data?.node_type === 'llm' && (eventData as NodeFinishedEvent).data?.outputs?.text) {
       const text = (eventData as NodeFinishedEvent).data.outputs.text;
-      if (text && text.trim()) {
+      // 改行のみのテキストも処理するように条件を変更
+      if (text && (text.trim() || text.includes('\n'))) {
         this.sendChunk(text, true, onChunk, lastContent);
       }
     } else if (eventData.event === 'workflow_finished' && (eventData as WorkflowFinishedEvent).data?.outputs) {
       // outputsから結果を抽出
       for (const [key, value] of Object.entries((eventData as WorkflowFinishedEvent).data.outputs)) {
-        if (typeof value === 'string' && value.trim() && !this.shouldIgnoreData(key, value)) {
+        // 改行のみのテキストも処理するように条件を変更
+        if (typeof value === 'string' && (value.trim() || value.includes('\n')) && !this.shouldIgnoreData(key, value)) {
           this.sendChunk(value, true, onChunk, lastContent);
           break;
         }
@@ -195,7 +202,8 @@ export class DifyStreamProcessor implements StreamProcessor {
     lastContent: string
   ): void {
     // 重複チェック - 前回と同じ内容なら送信しない
-    if (content === lastContent || !content.trim()) {
+    // 改行のみのチャンクも処理するように条件を変更
+    if (content === lastContent || (!content.trim() && !content.includes('\n'))) {
       if (this.debug) {
         console.log(`⏭️ [DifyStreamProcessor] 重複または空のチャンクをスキップ`);
       }
@@ -204,7 +212,19 @@ export class DifyStreamProcessor implements StreamProcessor {
     
     if (this.debug) {
       console.log(`📤 [DifyStreamProcessor] チャンク送信: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''} ${isFinal ? '(最終結果)' : ''}`);
+      
+      // チャンクの詳細ログ（改行を可視化）
+      const contentWithVisibleNewlines = content.replace(/\n/g, '\\n');
+      console.log(`🔍 [DifyStreamProcessor] チャンク詳細: "${contentWithVisibleNewlines}"`);
+      
+      // チャンクの文字コード表示
+      const charCodes = Array.from(content).map(char => {
+        const code = char.charCodeAt(0);
+        return `${char}(${code})`;
+      }).join(' ');
+      console.log(`🔢 [DifyStreamProcessor] チャンク文字コード: ${charCodes}`);
     }
+    
     onChunk(content, isFinal);
   }
   

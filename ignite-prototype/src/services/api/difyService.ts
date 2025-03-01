@@ -24,7 +24,7 @@ export const fetchDifyInspirationStream = async (
   try {
     // クライアントとストリームプロセッサを作成
     const client = createDifyClient();
-    const streamProcessor = createStreamProcessor({ debug: true });
+    const streamProcessor = createStreamProcessor({ debug: true }); // デバッグモードを有効化
     
     // リクエストデータの準備
     const inputs = {

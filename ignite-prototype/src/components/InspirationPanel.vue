@@ -1,13 +1,23 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
 import { fetchDifyInspirationStream } from '@/services/api/difyService'
 import { createApiErrorMessage, logError } from '@/utils/errorHandler'
+import { createMarkdownStreamRenderer } from '@/services/api/markdownStreamRenderer'
+
+// レンダラーのインスタンスを作成
+const markdownRenderer = createMarkdownStreamRenderer()
 
 // State
 const inspirationText = ref('AIのインスピレーションがここに表示されます')
+const renderedHtml = ref('')
 const isLoading = ref(false)
 const hasError = ref(false)
+
+// 初期化時にレンダリング
+onMounted(() => {
+  renderedHtml.value = marked.parse(inspirationText.value) as string
+})
 
 // Props and emits
 const props = defineProps<{
@@ -27,8 +37,12 @@ const updateInspiration = async () => {
     isLoading.value = true
     hasError.value = false
     inspirationText.value = '## 生成中...\n\n'
+    renderedHtml.value = marked.parse(inspirationText.value) as string
     emit('update')
     console.log('🔄 [InspirationPanel] 初期状態更新')
+    
+    // レンダラーをリセット
+    markdownRenderer.reset()
     
     // ストリーミングモードでAPI呼び出し
     console.log('🚀 [InspirationPanel] ストリーミングAPI呼び出し開始')
@@ -38,17 +52,22 @@ const updateInspiration = async () => {
       chunkCount++
       console.log(`📦 [InspirationPanel] チャンク #${chunkCount} 受信: ${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''} ${isFinal ? '(最終結果)' : ''}`)
       
-      // 最終結果の場合は、内容を置き換える
-      if (isFinal) {
-        console.log('🔄 [InspirationPanel] 最終結果を受信 - 内容を置き換えます')
-        inspirationText.value = chunk
+      // レンダラーでチャンクを処理
+      const result = markdownRenderer.processChunk(chunk, !!isFinal)
+      
+      // テキストと描画結果を更新
+      inspirationText.value = result.text
+      
+      // ストリーミングマーカーを置換してクラスを追加
+      let html = result.html
+      if (!isFinal) {
+        html = html.replace(
+          /<p><!-- streaming-marker --><\/p>/,
+          '<div class="streaming-indicator"></div>'
+        )
       }
-      // 最初のチャンクが来たら「生成中...」を消去
-      else if (chunkCount === 1) {
-        inspirationText.value = chunk
-      } else {
-        inspirationText.value += chunk
-      }
+      
+      renderedHtml.value = html
       
       console.log(`📊 [InspirationPanel] テキスト合計長: ${inspirationText.value.length} 文字`)
       emit('update')
@@ -63,6 +82,7 @@ const updateInspiration = async () => {
     logError('InspirationPanel', error)
     hasError.value = true
     inspirationText.value = createApiErrorMessage(error)
+    renderedHtml.value = marked.parse(inspirationText.value) as string
     console.log('⚠️ [InspirationPanel] エラーメッセージ表示')
   } finally {
     isLoading.value = false
@@ -70,17 +90,13 @@ const updateInspiration = async () => {
   }
 }
 
-// Computed properties
-const renderedMarkdown = computed(() => {
-  return marked(inspirationText.value)
-})
 </script>
 
 <template>
   <div class="inspiration-panel">
     <div 
       class="markdown-content card custom-scrollbar"
-      v-html="renderedMarkdown"
+      v-html="renderedHtml"
     ></div>
     <div class="button-container">
       <button 
