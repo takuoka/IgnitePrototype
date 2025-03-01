@@ -77,6 +77,12 @@ export class MarkdownStreamRenderer {
     // 不完全な構造を一時的に修正
     let processed = text
     
+    // 見出し記号の後にスペースがない場合、スペースを挿入
+    processed = processed.replace(/(^|\n)(#{1,6})([^\s#])/g, '$1$2 $3')
+    
+    // 行末または文字列末尾の見出し記号にスペースを追加（ストリーミング時のチャンク分割対策）
+    processed = processed.replace(/(^|\n)(#{1,6})(\s*)$/g, '$1$2$3 ')
+    
     // Markdown構文要素（見出し）の前に改行を挿入
     processed = processed.replace(/([^\n])(\s*)(#{1,6}\s)/g, '$1\n\n$2$3')
     

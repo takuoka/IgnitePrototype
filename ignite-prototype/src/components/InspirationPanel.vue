@@ -119,12 +119,12 @@ const updateInspiration = async () => {
     emit('update')
     console.log('🔄 [InspirationPanel] 初期状態更新')
     
-    // レンダラーをリセット
-    markdownRenderer.reset()
-    
     // ストリーミングモードでAPI呼び出し
     console.log('🚀 [InspirationPanel] ストリーミングAPI呼び出し開始')
     let chunkCount = 0
+    
+    // レンダラーをリセット
+    markdownRenderer.reset()
     
     await fetchDifyInspirationStream(props.lyrics || '', (chunk: string, isFinal?: boolean) => {
       chunkCount++
