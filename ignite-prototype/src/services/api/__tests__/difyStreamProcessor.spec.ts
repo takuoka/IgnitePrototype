@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DifyStreamProcessor, createStreamProcessor, type StreamProcessor } from '../difyStreamProcessor'
+import * as difyStreamParser from '../difyStreamParser'
+import * as difyEventHandler from '../difyEventHandler'
 import type { StreamingEventData, TextChunkEvent, NodeFinishedEvent, WorkflowFinishedEvent } from '../../../types'
+
+// モジュールのモック
+vi.mock('../difyStreamParser', () => ({
+  createStreamParser: vi.fn()
+}))
+
+vi.mock('../difyEventHandler', () => ({
+  createEventHandler: vi.fn()
+}))
 
 describe('DifyStreamProcessor', () => {
   // テスト用のモックデータ
@@ -43,23 +54,26 @@ describe('DifyStreamProcessor', () => {
     }
   }
 
-  const mockWorkflowFinishedEvent: WorkflowFinishedEvent = {
-    event: 'workflow_finished',
-    workflow_run_id: 'test-workflow-id',
-    task_id: 'test-task-id',
-    data: {
-      id: 'test-id',
-      workflow_id: 'test-workflow-id',
-      status: 'success',
-      error: null,
-      elapsed_time: 200,
-      outputs: {
-        result: 'ワークフロー完了結果'
-      },
-      created_at: Date.now(),
-      finished_at: Date.now()
-    }
+  // モックオブジェクト
+  const mockStreamParser = {
+    parseChunk: vi.fn(),
+    clearBuffer: vi.fn(),
+    getBuffer: vi.fn()
   }
+  
+  const mockEventHandler = {
+    handleEvent: vi.fn()
+  }
+
+  // テスト前の準備
+  beforeEach(() => {
+    // モックのリセット
+    vi.clearAllMocks()
+    
+    // モックの設定
+    vi.mocked(difyStreamParser.createStreamParser).mockReturnValue(mockStreamParser)
+    vi.mocked(difyEventHandler.createEventHandler).mockReturnValue(mockEventHandler)
+  })
 
   // テスト1: インスタンス化のテスト
   describe('インスタンス化', () => {
@@ -73,159 +87,49 @@ describe('DifyStreamProcessor', () => {
       expect(processor).toBeInstanceOf(DifyStreamProcessor)
     })
 
+    it('カスタムパーサーとハンドラーでインスタンス化できること', () => {
+      const processor = new DifyStreamProcessor({}, mockStreamParser, mockEventHandler)
+      expect(processor).toBeInstanceOf(DifyStreamProcessor)
+    })
+
     it('createStreamProcessor関数でインスタンスを作成できること', () => {
       const processor = createStreamProcessor()
       expect(processor).toBeInstanceOf(DifyStreamProcessor)
     })
   })
 
-  // テスト2: shouldIgnoreDataメソッドのテスト
-  describe('shouldIgnoreData', () => {
-    let processor: DifyStreamProcessor
-
-    beforeEach(() => {
-      processor = new DifyStreamProcessor()
-    })
-
-    it('resultキーを含むデータは無視しないこと', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('result', 'テストデータ')
-      expect(result).toBe(false)
-    })
-
-    it('textキーを含むデータは無視しないこと', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('text', 'テストデータ')
-      expect(result).toBe(false)
-    })
-
-    it('answerキーを含むデータは無視しないこと', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('answer', 'テストデータ')
-      expect(result).toBe(false)
-    })
-
-    it('contentキーを含むデータは無視しないこと', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('content', 'テストデータ')
-      expect(result).toBe(false)
-    })
-
-    it('currentLyricを含むキーのデータは無視すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('currentLyric', 'テストデータ')
-      expect(result).toBe(true)
-    })
-
-    it('sys.を含むキーのデータは無視すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('sys.test', 'テストデータ')
-      expect(result).toBe(true)
-    })
-
-    it('inputsを含むキーでresultで終わらないデータは無視すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('inputs.test', 'テストデータ')
-      expect(result).toBe(true)
-    })
-
-    it('inputsを含むキーでresultで終わるデータは無視しないこと', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('inputs.result', 'テストデータ')
-      expect(result).toBe(false)
-    })
-
-    it('"stop"という値のデータは無視すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      const result = processor.shouldIgnoreData('test', 'stop')
-      expect(result).toBe(true)
-    })
-  })
-
-  // テスト3: sendChunkメソッドのテスト
-  describe('sendChunk', () => {
-    let processor: DifyStreamProcessor
-    let onChunkMock: any
-
-    beforeEach(() => {
-      processor = new DifyStreamProcessor()
-      onChunkMock = vi.fn()
-    })
-
-    it('有効なチャンクを送信すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      processor.sendChunk('新しいチャンク', false, onChunkMock, '')
-      expect(onChunkMock).toHaveBeenCalledWith('新しいチャンク', false)
-    })
-
-    it('最終チャンクを送信すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      processor.sendChunk('最終チャンク', true, onChunkMock, '')
-      expect(onChunkMock).toHaveBeenCalledWith('最終チャンク', true)
-    })
-
-    it('前回と同じ内容のチャンクは送信しないこと', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      processor.sendChunk('重複チャンク', false, onChunkMock, '重複チャンク')
-      expect(onChunkMock).not.toHaveBeenCalled()
-    })
-
-    it('空のチャンクは送信しないこと', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      processor.sendChunk('', false, onChunkMock, '')
-      expect(onChunkMock).not.toHaveBeenCalled()
-    })
-
-    it('空白のみのチャンクは送信しないこと', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      processor.sendChunk('   ', false, onChunkMock, '')
-      expect(onChunkMock).not.toHaveBeenCalled()
-    })
-  })
-
-  // テスト4: processEventDataメソッドのテスト
-  describe('processEventData', () => {
-    let processor: DifyStreamProcessor
-    let onChunkMock: any
-
-    beforeEach(() => {
-      processor = new DifyStreamProcessor()
-      onChunkMock = vi.fn()
-    })
-
-    it('text_chunkイベントを処理すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      processor.processEventData(mockTextChunkEvent, onChunkMock, '', '')
-      expect(onChunkMock).toHaveBeenCalledWith('テストテキスト', false)
-    })
-
-    it('node_finishedイベント（llmタイプ）を処理すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      processor.processEventData(mockNodeFinishedEvent, onChunkMock, '', '')
-      expect(onChunkMock).toHaveBeenCalledWith('ノード完了テキスト', true)
-    })
-
-    it('workflow_finishedイベントを処理すること', () => {
-      // @ts-ignore - privateメソッドへのアクセス
-      processor.processEventData(mockWorkflowFinishedEvent, onChunkMock, '', '')
-      expect(onChunkMock).toHaveBeenCalledWith('ワークフロー完了結果', true)
-    })
-  })
-
-  // テスト5: processStreamメソッドのテスト
+  // テスト2: processStreamメソッドのテスト
   describe('processStream', () => {
     let processor: DifyStreamProcessor
     let onChunkMock: any
     let mockReader: any
 
     beforeEach(() => {
-      processor = new DifyStreamProcessor()
+      processor = new DifyStreamProcessor({}, mockStreamParser, mockEventHandler)
       onChunkMock = vi.fn()
       
       // ReadableStreamDefaultReaderのモック
       mockReader = {
         read: vi.fn()
       }
+      
+      // イベントハンドラーのモック設定
+      mockEventHandler.handleEvent.mockImplementation((eventData, onChunk, accumulatedText, lastContent) => {
+        if (eventData.event === 'text_chunk') {
+          onChunk((eventData as TextChunkEvent).data.text, false)
+          return {
+            accumulatedText: accumulatedText + (eventData as TextChunkEvent).data.text,
+            lastContent: (eventData as TextChunkEvent).data.text
+          }
+        } else if (eventData.event === 'node_finished') {
+          onChunk((eventData as NodeFinishedEvent).data.outputs.text, true)
+          return {
+            accumulatedText: '',
+            lastContent: (eventData as NodeFinishedEvent).data.outputs.text
+          }
+        }
+        return { accumulatedText, lastContent }
+      })
     })
 
     it('空のストリームを処理すること', async () => {
@@ -238,38 +142,63 @@ describe('DifyStreamProcessor', () => {
     })
 
     it('テキストチャンクを含むストリームを処理すること', async () => {
-      // テキストチャンクイベントのエンコード
-      const encoder = new TextEncoder()
-      const eventData = `data: ${JSON.stringify(mockTextChunkEvent)}\n\n`
-      const chunk = encoder.encode(eventData)
+      // ストリームパーサーのモック設定
+      mockStreamParser.parseChunk.mockReturnValueOnce([mockTextChunkEvent])
       
       // 1回目の読み取りでチャンクを返し、2回目で完了を示す
       mockReader.read
-        .mockResolvedValueOnce({ done: false, value: chunk })
+        .mockResolvedValueOnce({ done: false, value: new Uint8Array([1, 2, 3]) })
         .mockResolvedValueOnce({ done: true, value: undefined })
       
       await processor.processStream(mockReader, onChunkMock)
+      
       expect(mockReader.read).toHaveBeenCalledTimes(2)
+      expect(mockStreamParser.parseChunk).toHaveBeenCalledTimes(1)
+      expect(mockEventHandler.handleEvent).toHaveBeenCalledWith(
+        mockTextChunkEvent,
+        onChunkMock,
+        '',
+        ''
+      )
       expect(onChunkMock).toHaveBeenCalledWith('テストテキスト', false)
     })
 
     it('複数のイベントを含むストリームを処理すること', async () => {
-      // 複数のイベントをエンコード
-      const encoder = new TextEncoder()
-      const eventData1 = `data: ${JSON.stringify(mockTextChunkEvent)}\n\n`
-      const eventData2 = `data: ${JSON.stringify(mockNodeFinishedEvent)}\n\n`
-      const chunk = encoder.encode(eventData1 + eventData2)
+      // ストリームパーサーのモック設定
+      mockStreamParser.parseChunk.mockReturnValueOnce([mockTextChunkEvent, mockNodeFinishedEvent])
       
       // 1回目の読み取りでチャンクを返し、2回目で完了を示す
       mockReader.read
-        .mockResolvedValueOnce({ done: false, value: chunk })
+        .mockResolvedValueOnce({ done: false, value: new Uint8Array([1, 2, 3]) })
         .mockResolvedValueOnce({ done: true, value: undefined })
       
       await processor.processStream(mockReader, onChunkMock)
+      
       expect(mockReader.read).toHaveBeenCalledTimes(2)
+      expect(mockStreamParser.parseChunk).toHaveBeenCalledTimes(1)
+      expect(mockEventHandler.handleEvent).toHaveBeenCalledTimes(2)
       expect(onChunkMock).toHaveBeenCalledTimes(2)
-      expect(onChunkMock).toHaveBeenNthCalledWith(1, 'テストテキスト', false)
-      expect(onChunkMock).toHaveBeenNthCalledWith(2, 'ノード完了テキスト', true)
+    })
+
+    it('ストリーム終了時に累積テキストがあれば送信すること', async () => {
+      // ストリームパーサーのモック設定
+      mockStreamParser.parseChunk.mockReturnValueOnce([mockTextChunkEvent])
+      
+      // イベントハンドラーのモック設定を上書き
+      mockEventHandler.handleEvent.mockReturnValueOnce({
+        accumulatedText: 'テスト累積テキスト',
+        lastContent: 'テストテキスト'
+      })
+      
+      // 1回目の読み取りでチャンクを返し、2回目で完了を示す
+      mockReader.read
+        .mockResolvedValueOnce({ done: false, value: new Uint8Array([1, 2, 3]) })
+        .mockResolvedValueOnce({ done: true, value: undefined })
+      
+      await processor.processStream(mockReader, onChunkMock)
+      
+      // 最後に累積テキストが送信されること
+      expect(onChunkMock).toHaveBeenLastCalledWith('テスト累積テキスト', true)
     })
 
     it('ストリーム処理中にエラーが発生した場合、エラーをスローすること', async () => {
