@@ -79,7 +79,7 @@ export const fetchDifyInspiration = async (lyrics: string): Promise<string> => {
  */
 export const fetchDifyInspirationStream = async (
   lyrics: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string, isFinal?: boolean) => void
 ): Promise<void> => {
   console.log('🚀 [DifyAPI] ストリーミングAPI呼び出し開始')
   console.log('📝 [DifyAPI] 入力歌詞:', lyrics.substring(0, 100) + (lyrics.length > 100 ? '...' : ''))
@@ -138,6 +138,40 @@ export const fetchDifyInspirationStream = async (
   const decoder = new TextDecoder('utf-8')
   let buffer = ''
   let chunkCount = 0
+  let lastContent = ''
+  
+  // UUIDパターン（例: 8bb6df6f-d3d4-482e-90d5-6c57437f3316）
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+  
+  // UUIDを削除する関数
+  const removeUuid = (text: string): string => {
+    if (uuidPattern.test(text)) {
+      const cleaned = text.replace(uuidPattern, '');
+      console.log(`🔍 [DifyAPI] UUIDを削除しました`);
+      return cleaned;
+    }
+    return text;
+  };
+  
+  // 最終結果かどうかを判定する関数
+  const isFinalResult = (eventData: any): boolean => {
+    // workflow_finishedイベントは最終結果を示す
+    if (eventData.event === 'workflow_finished') {
+      console.log('🏁 [DifyAPI] workflow_finishedイベント検出 - 最終結果として処理します')
+      return true
+    }
+    
+    // node_finishedイベントで、最後のノードの場合も最終結果と見なす
+    if (eventData.event === 'node_finished' && eventData.data?.status === 'succeeded') {
+      // 通常、最後のノードはoutputsを持っている
+      if (eventData.data?.outputs && Object.keys(eventData.data.outputs).length > 0) {
+        console.log('🏁 [DifyAPI] 最終ノード完了イベント検出 - 最終結果として処理します')
+        return true
+      }
+    }
+    
+    return false
+  };
   
   // ストリーミングデータを逐次読み取る
   while (true) {
@@ -207,8 +241,20 @@ export const fetchDifyInspirationStream = async (
             }
             
             if (result) {
-              console.log(`📤 [DifyAPI] チャンク送信: ${result.substring(0, 50)}${result.length > 50 ? '...' : ''}`)
-              onChunk(result)
+              // UUIDを削除
+              result = removeUuid(result);
+              
+              // 最終結果かどうかをチェック
+              const final = isFinalResult(eventData);
+              
+              // 重複チェック - 前回と同じ内容なら送信しない
+              if (result !== lastContent && result.trim()) {
+                console.log(`📤 [DifyAPI] チャンク送信: ${result.substring(0, 50)}${result.length > 50 ? '...' : ''} ${final ? '(最終結果)' : ''}`)
+                lastContent = result;
+                onChunk(result, final)
+              } else {
+                console.log(`⏭️ [DifyAPI] 重複または空のチャンクをスキップ`)
+              }
             } else {
               console.log('⚠️ [DifyAPI] 結果フィールドなし:', eventData)
               // 詳細なデータ構造をログに出力
@@ -223,14 +269,24 @@ export const fetchDifyInspirationStream = async (
                   for (const [key, value] of Object.entries(eventData.data)) {
                     if (typeof value === 'string' && value.trim().length > 0) {
                       console.log(`✨ [DifyAPI] data.${key}検出:`, value)
-                      onChunk(value)
+                      // UUIDを削除して送信
+                      const cleanedValue = removeUuid(value);
+                      if (cleanedValue !== lastContent) {
+                        lastContent = cleanedValue;
+                        onChunk(cleanedValue)
+                      }
                       break
                     } else if (value && typeof value === 'object') {
                       // ネストされたオブジェクトの中も探す
                       for (const [nestedKey, nestedValue] of Object.entries(value)) {
                         if (typeof nestedValue === 'string' && nestedValue.trim().length > 0) {
                           console.log(`✨ [DifyAPI] data.${key}.${nestedKey}検出:`, nestedValue)
-                          onChunk(nestedValue)
+                          // UUIDを削除して送信
+                          const cleanedValue = removeUuid(nestedValue);
+                          if (cleanedValue !== lastContent) {
+                            lastContent = cleanedValue;
+                            onChunk(cleanedValue)
+                          }
                           break
                         }
                       }

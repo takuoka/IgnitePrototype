@@ -37,10 +37,25 @@ const updateInspiration = async () => {
       console.log('🚀 [InspirationPanel] ストリーミングAPI呼び出し開始')
       let chunkCount = 0
       
-      await fetchDifyInspirationStream(props.lyrics || '', (chunk: string) => {
+      // ストリーミング開始時に内容をリセット
+      inspirationText.value = '## 生成中...\n\n'
+      
+      await fetchDifyInspirationStream(props.lyrics || '', (chunk: string, isFinal?: boolean) => {
         chunkCount++
-        console.log(`📦 [InspirationPanel] チャンク #${chunkCount} 受信: ${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''}`)
-        inspirationText.value += chunk
+        console.log(`📦 [InspirationPanel] チャンク #${chunkCount} 受信: ${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''} ${isFinal ? '(最終結果)' : ''}`)
+        
+        // 最終結果の場合は、内容を置き換える
+        if (isFinal) {
+          console.log('🔄 [InspirationPanel] 最終結果を受信 - 内容を置き換えます')
+          inspirationText.value = chunk
+        }
+        // 最初のチャンクが来たら「生成中...」を消去
+        else if (chunkCount === 1) {
+          inspirationText.value = chunk
+        } else {
+          inspirationText.value += chunk
+        }
+        
         console.log(`📊 [InspirationPanel] テキスト合計長: ${inspirationText.value.length} 文字`)
         emit('update')
         console.log('🔄 [InspirationPanel] UI更新イベント発行')
