@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { DifyEventHandler, DifyContentFilter, createEventHandler } from '../difyEventHandler'
+import { DifyEventHandler, createEventHandler } from '../difyEventHandler'
+import { DifyContentFilter } from '../eventHandlers'
 import type { StreamingEventData, TextChunkEvent, NodeFinishedEvent, WorkflowFinishedEvent } from '../../../types'
 
 describe('DifyEventHandler', () => {
