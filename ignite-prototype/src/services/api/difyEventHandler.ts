@@ -93,14 +93,41 @@ export class DifyEventHandler implements EventHandler {
         newAccumulatedText = '';
       }
     } else if (eventData.event === 'workflow_finished' && (eventData as WorkflowFinishedEvent).data?.outputs) {
-      // outputsから結果を抽出
-      for (const [key, value] of Object.entries((eventData as WorkflowFinishedEvent).data.outputs)) {
-        // 改行のみのテキストも処理するように条件を変更
-        if (typeof value === 'string' && (value.trim() || value.includes('\n')) && !this.contentFilter.shouldIgnoreData(key, value)) {
-          this.sendChunk(value, true, onChunk, lastContent);
-          newLastContent = value;
+      const outputs = (eventData as WorkflowFinishedEvent).data.outputs;
+      
+      // 新しいフィールド（advice, phrases, words）が存在するか確認
+      if (outputs.advice || outputs.phrases || outputs.words) {
+        // 複数フィールドを連結して表示
+        const sections = [];
+        
+        if (outputs.advice && typeof outputs.advice === 'string' && (outputs.advice.trim() || outputs.advice.includes('\n'))) {
+          sections.push(`## アドバイス\n\n${outputs.advice}`);
+        }
+        
+        if (outputs.phrases && typeof outputs.phrases === 'string' && (outputs.phrases.trim() || outputs.phrases.includes('\n'))) {
+          sections.push(`## フレーズ\n\n${outputs.phrases}`);
+        }
+        
+        if (outputs.words && typeof outputs.words === 'string' && (outputs.words.trim() || outputs.words.includes('\n'))) {
+          sections.push(`## キーワード\n\n${outputs.words}`);
+        }
+        
+        if (sections.length > 0) {
+          const combinedContent = sections.join('\n\n');
+          this.sendChunk(combinedContent, true, onChunk, lastContent);
+          newLastContent = combinedContent;
           newAccumulatedText = '';
-          break;
+        }
+      } else {
+        // 従来の処理（後方互換性のため）
+        for (const [key, value] of Object.entries(outputs)) {
+          // 改行のみのテキストも処理するように条件を変更
+          if (typeof value === 'string' && (value.trim() || value.includes('\n')) && !this.contentFilter.shouldIgnoreData(key, value)) {
+            this.sendChunk(value, true, onChunk, lastContent);
+            newLastContent = value;
+            newAccumulatedText = '';
+            break;
+          }
         }
       }
     } else if (eventData.event === 'node_finished' && (eventData as NodeFinishedEvent).data?.outputs?.text) {
@@ -191,7 +218,7 @@ export class DifyContentFilter implements ContentFilter {
    */
   shouldIgnoreData(key: string, value: any): boolean {
     // 最終結果を示す可能性のあるキー
-    const resultKeys = ['result', 'text', 'answer', 'content'];
+    const resultKeys = ['result', 'text', 'answer', 'content', 'advice', 'phrases', 'words'];
     
     // 最終結果を示すキーの場合はスキップしない
     if (resultKeys.some(resultKey => key === resultKey || key.endsWith(`.${resultKey}`))) {

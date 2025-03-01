@@ -61,6 +61,27 @@ describe('DifyEventHandler', () => {
     }
   }
 
+  // 新しいフィールドを含むワークフローイベント
+  const mockMultiOutputWorkflowFinishedEvent: WorkflowFinishedEvent = {
+    event: 'workflow_finished',
+    workflow_run_id: 'test-workflow-id',
+    task_id: 'test-task-id',
+    data: {
+      id: 'test-id',
+      workflow_id: 'test-workflow-id',
+      status: 'success',
+      error: null,
+      elapsed_time: 200,
+      outputs: {
+        advice: 'アドバイス内容',
+        phrases: 'フレーズ内容',
+        words: 'キーワード内容'
+      },
+      created_at: Date.now(),
+      finished_at: Date.now()
+    }
+  }
+
   // テスト1: インスタンス化のテスト
   describe('インスタンス化', () => {
     it('デフォルトオプションでインスタンス化できること', () => {
@@ -104,6 +125,21 @@ describe('DifyEventHandler', () => {
 
     it('contentキーを含むデータは無視しないこと', () => {
       const result = filter.shouldIgnoreData('content', 'テストデータ')
+      expect(result).toBe(false)
+    })
+
+    it('adviceキーを含むデータは無視しないこと', () => {
+      const result = filter.shouldIgnoreData('advice', 'テストデータ')
+      expect(result).toBe(false)
+    })
+
+    it('phrasesキーを含むデータは無視しないこと', () => {
+      const result = filter.shouldIgnoreData('phrases', 'テストデータ')
+      expect(result).toBe(false)
+    })
+
+    it('wordsキーを含むデータは無視しないこと', () => {
+      const result = filter.shouldIgnoreData('words', 'テストデータ')
       expect(result).toBe(false)
     })
 
@@ -165,6 +201,16 @@ describe('DifyEventHandler', () => {
       expect(onChunkMock).toHaveBeenCalledWith('ワークフロー完了結果', true)
       expect(result.accumulatedText).toBe('')
       expect(result.lastContent).toBe('ワークフロー完了結果')
+    })
+
+    it('複数の出力フィールドを含むworkflow_finishedイベントを処理すること', () => {
+      const result = handler.handleEvent(mockMultiOutputWorkflowFinishedEvent, onChunkMock, 'これまでのテキスト', '')
+      
+      // 3つのフィールドが連結されて処理されることを期待
+      const expectedOutput = '## アドバイス\n\nアドバイス内容\n\n## フレーズ\n\nフレーズ内容\n\n## キーワード\n\nキーワード内容'
+      expect(onChunkMock).toHaveBeenCalledWith(expectedOutput, true)
+      expect(result.accumulatedText).toBe('')
+      expect(result.lastContent).toBe(expectedOutput)
     })
 
     it('前回と同じ内容のチャンクは送信しないこと', () => {

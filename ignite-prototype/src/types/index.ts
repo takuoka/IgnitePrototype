@@ -10,6 +10,9 @@ export interface DifyAPIResponse {
   data?: {
     outputs?: {
       result?: string
+      advice?: string
+      phrases?: string
+      words?: string
     }
   }
 }
