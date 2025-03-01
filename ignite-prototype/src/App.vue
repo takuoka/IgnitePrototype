@@ -2,14 +2,9 @@
 import { ref, computed } from 'vue'
 import LyricsEditor from './components/LyricsEditor.vue'
 import InspirationPanel from './components/InspirationPanel.vue'
+import type { LyricsEditorInterface } from './types'
 
-interface LyricsEditor {
-  lyrics: {
-    get: () => string
-  }
-}
-
-const lyricsEditorRef = ref<LyricsEditor | null>(null)
+const lyricsEditorRef = ref<LyricsEditorInterface | null>(null)
 
 const currentLyrics = computed(() => lyricsEditorRef.value?.lyrics.get() || '')
 

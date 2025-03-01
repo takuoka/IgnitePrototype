@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { LyricsEditorInterface } from '@/types'
 
 const lyrics = ref('')
 
-defineExpose({
+// Expose the interface for parent components
+defineExpose<LyricsEditorInterface>({
   lyrics: {
     get: () => lyrics.value
   }
@@ -15,7 +17,7 @@ defineExpose({
     <textarea
       v-model="lyrics"
       placeholder="ここに歌詞を書いてください..."
-      class="editor-textarea"
+      class="editor-textarea card custom-scrollbar"
       spellcheck="false"
     ></textarea>
   </div>

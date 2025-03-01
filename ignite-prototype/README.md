@@ -1,48 +1,77 @@
-# Ignite Prototype - 歌詞エディタ
+# Ignite Prototype
 
-歌詞を書くためのWebベースエディタのプロトタイプです。AIからのインスピレーションを受けながら、創造的な歌詞作成をサポートします。
+歌詞作成のインスピレーションを得るためのアプリケーション。
+
+## プロジェクト構成
+
+```
+ignite-prototype/
+├── src/
+│   ├── assets/         # 静的アセット（CSS、画像など）
+│   ├── components/     # Vueコンポーネント
+│   ├── services/       # APIサービス
+│   │   └── api/        # API関連のサービス
+│   ├── styles/         # 共通スタイル
+│   ├── types/          # 型定義
+│   └── utils/          # ユーティリティ関数
+├── public/             # 公開ディレクトリ
+└── .env.local          # 環境変数（APIキーなど）
+```
 
 ## 機能
 
-- 左ペイン (70%): 歌詞エディタ
-  - シンプルで使いやすいテキストエリア
-  - リアルタイムな状態管理
-
-- 右ペイン (30%): AIインスピレーション
-  - Markdown形式でのアイデア表示
-  - 「更新」ボタンでAIからの新しいアイデアを取得
+- 歌詞エディタ: 歌詞を入力・編集できる
+- インスピレーションパネル: 入力された歌詞に基づいてAIがインスピレーションを提供
 
 ## 技術スタック
 
-- フロントエンド: Vue 3 + TypeScript
-- スタイリング: カスタムCSS（ダークモード）
-- Markdown: marked.js
+- Vue 3 + TypeScript
+- Vite
+- Dify API (AI機能)
 
 ## セットアップ
 
-```bash
-# 依存関係のインストール
-npm install
+1. 依存関係のインストール:
 
-# 開発サーバーの起動
+```bash
+npm install
+```
+
+2. 環境変数の設定:
+
+`.env.local`ファイルを作成し、必要なAPI設定を追加:
+
+```
+VITE_DIFY_API_KEY=your-api-key
+VITE_DIFY_API_BASE_URL=https://api.dify.ai/v1
+```
+
+3. 開発サーバーの起動:
+
+```bash
 npm run dev
 ```
 
-## 環境変数
+## コード構造
 
-バックエンドAPIを使用する場合は、`.env`ファイルを作成し、以下の変数を設定してください：
+### コンポーネント
 
-```env
-VITE_API_ENDPOINT=http://your-api-endpoint
-```
+- `App.vue`: メインアプリケーションコンポーネント
+- `LyricsEditor.vue`: 歌詞入力用エディタ
+- `InspirationPanel.vue`: AIインスピレーション表示パネル
 
-## バックエンド連携
+### サービス
 
-現在はモックAPIを使用していますが、実際のバックエンドAPIに接続する場合は、`src/components/InspirationPanel.vue`の`fetchDefyMock`関数を実際のAPI呼び出しに置き換えてください。
+- `difyService.ts`: Dify APIとの通信を担当
 
-## 今後の拡張予定
+### 型定義
 
-- 実際のDefy APIとの連携
-- 追加機能（韻を踏む、国語力UP等）のボタン
-- 歌詞の保存＆シェア機能
-- レスポンシブデザインの強化
+- `types/index.ts`: アプリケーション全体で使用される型定義
+
+### ユーティリティ
+
+- `errorHandler.ts`: エラー処理のためのユーティリティ関数
+
+### スタイル
+
+- `common.css`: 共通スタイル定義
