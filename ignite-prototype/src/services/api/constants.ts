@@ -12,22 +12,22 @@ export const INPUT_VARIABLE_NAMES = ['currentLyric', 'favorite_lyrics', 'global_
 /**
  * 出力変数名の配列
  */
-export const VARIABLE_NAMES = ['advice', 'phrases', 'words', 'lyric', 'final_phrase'];
+export const VARIABLE_NAMES = ['advice', 'words', 'phrases', 'lyric', 'final_phrase'];
 
 /**
  * ノードタイトルとセッション変数のマッピング
  */
 export const TITLE_TO_VARIABLE_MAP: Record<string, string> = {
   // 日本語タイトル
-  'アドバイス': 'advice',
-  'フレーズ': 'phrases',
-  'ワード': 'words',
-  '歌詞': 'lyric',
-  '最終フレーズ': 'final_phrase',
+  '歌詞にAdvice': 'advice',
+  'ブラッシュアップWords': 'words',
+  'ブラッシュアップPhrases': 'phrases',
+  'インスピレーションLyric': 'lyric',
+  '最後のフレーズ': 'final_phrase',
   // 英語タイトル
   'advice': 'advice',
-  'phrases': 'phrases',
   'words': 'words',
+  'phrases': 'phrases',
   'lyric': 'lyric',
   'final_phrase': 'final_phrase'
 };
@@ -36,11 +36,11 @@ export const TITLE_TO_VARIABLE_MAP: Record<string, string> = {
  * 変数名とセクションタイトルのマッピング
  */
 export const VARIABLE_TO_TITLE_MAP: Record<string, string> = {
-  'advice': 'アドバイス',
-  'phrases': 'フレーズ',
-  'words': 'キーワード',
-  'lyric': '歌詞',
-  'final_phrase': '最終フレーズ'
+  'advice': '歌詞にAdvice',
+  'phrases': 'ブラッシュアップPhrases',
+  'words': 'ブラッシュアップWords',
+  'lyric': 'インスピレーションLyric',
+  'final_phrase': '最後のフレーズ'
 };
 
 /**
