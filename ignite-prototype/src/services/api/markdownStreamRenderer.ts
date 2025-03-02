@@ -32,12 +32,12 @@ export class MarkdownStreamRenderer {
   /**
    * Markdownチャンクを処理し、HTMLレンダリング結果を返す
    * @param chunk 新しいチャンク
-   * @param isFinal 最終チャンクかどうか
+   * @param isWorkflowCompletion ワークフロー完了かどうか
    * @returns レンダリング結果
    */
-  processChunk(chunk: string, isFinal: boolean): MarkdownRenderResult {
-    // 最終チャンクの場合は、前のチャンクを無視して新しいチャンクだけを使用
-    if (isFinal) {
+  processChunk(chunk: string, isWorkflowCompletion: boolean): MarkdownRenderResult {
+    // ワークフロー完了の場合は、前のチャンクを無視して新しいチャンクだけを使用
+    if (isWorkflowCompletion) {
       this.accumulatedText = chunk
       return {
         text: this.accumulatedText,

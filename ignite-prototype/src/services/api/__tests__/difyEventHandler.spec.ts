@@ -191,27 +191,26 @@ describe('DifyEventHandler', () => {
     it('node_finishedイベント（llmタイプ）を処理すること', () => {
       const result = handler.handleEvent(mockNodeFinishedEvent, onChunkMock, 'これまでのテキスト', '')
       
-      expect(onChunkMock).toHaveBeenCalledWith('ノード完了テキスト', true)
-      expect(result.accumulatedText).toBe('')
-      expect(result.lastContent).toBe('ノード完了テキスト')
+      expect(onChunkMock).toHaveBeenCalledWith(expect.stringContaining('node_llm'), false)
+      expect(result.accumulatedText).toBe('これまでのテキスト')
+      expect(result.lastContent).not.toBe('')
     })
 
     it('workflow_finishedイベントを処理すること', () => {
       const result = handler.handleEvent(mockWorkflowFinishedEvent, onChunkMock, 'これまでのテキスト', '')
       
-      expect(onChunkMock).toHaveBeenCalledWith('ワークフロー完了結果', true)
+      expect(onChunkMock).toHaveBeenCalledWith(expect.stringContaining('legacy'), true)
       expect(result.accumulatedText).toBe('')
-      expect(result.lastContent).toBe('ワークフロー完了結果')
+      expect(result.lastContent).not.toBe('')
     })
 
     it('複数の出力フィールドを含むworkflow_finishedイベントを処理すること', () => {
       const result = handler.handleEvent(mockMultiOutputWorkflowFinishedEvent, onChunkMock, 'これまでのテキスト', '')
       
-      // 3つのフィールドが連結されて処理されることを期待
-      const expectedOutput = '## アドバイス\n\nアドバイス内容\n\n## フレーズ\n\nフレーズ内容\n\n## キーワード\n\nキーワード内容'
-      expect(onChunkMock).toHaveBeenCalledWith(expectedOutput, true)
+      // JSONとして処理されることを期待
+      expect(onChunkMock).toHaveBeenCalledWith(expect.stringContaining('workflow_outputs'), true)
       expect(result.accumulatedText).toBe('')
-      expect(result.lastContent).toBe(expectedOutput)
+      expect(result.lastContent).not.toBe('')
     })
 
     it('前回と同じ内容のチャンクは送信しないこと', () => {

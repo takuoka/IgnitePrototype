@@ -7,6 +7,7 @@
 import type { StreamingEventData } from '@/types';
 import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type IEventHandler } from './baseEventHandler';
 import { TextChunkEventHandler } from './textChunkEventHandler';
+import { NodeStartedEventHandler } from './nodeStartedEventHandler';
 import { NodeFinishedEventHandler } from './nodeFinishedEventHandler';
 import { WorkflowFinishedEventHandler } from './workflowFinishedEventHandler';
 
@@ -15,6 +16,8 @@ import { WorkflowFinishedEventHandler } from './workflowFinishedEventHandler';
  */
 export class MainEventHandler extends BaseEventHandler {
   private readonly handlers: IEventHandler[];
+  private readonly nodeStartedHandler: NodeStartedEventHandler;
+  private readonly workflowFinishedHandler: WorkflowFinishedEventHandler;
   
   /**
    * コンストラクタ
@@ -23,15 +26,33 @@ export class MainEventHandler extends BaseEventHandler {
   constructor(options: EventHandlerOptions = {}) {
     super(options);
     
+    // 特定のハンドラーへの参照を保持
+    this.nodeStartedHandler = new NodeStartedEventHandler(options);
+    this.workflowFinishedHandler = new WorkflowFinishedEventHandler(options);
+    
     // 各種ハンドラーを初期化
     this.handlers = [
-      new TextChunkEventHandler(options),
+      this.nodeStartedHandler,
+      new TextChunkEventHandler(options, this.nodeStartedHandler),
       new NodeFinishedEventHandler(options),
-      new WorkflowFinishedEventHandler(options)
+      this.workflowFinishedHandler
     ];
     
     if (this.debug) {
       console.log('🔧 [MainEventHandler] ハンドラー初期化完了');
+    }
+  }
+  
+  /**
+   * セッションをリセットする
+   * 新しいセッションが開始されたときに呼び出す
+   */
+  public resetSession(): void {
+    // WorkflowFinishedEventHandlerのセッションをリセット
+    this.workflowFinishedHandler.resetSession();
+    
+    if (this.debug) {
+      console.log('🔄 [MainEventHandler] セッションをリセット');
     }
   }
   

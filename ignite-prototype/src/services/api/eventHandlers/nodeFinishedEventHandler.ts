@@ -43,24 +43,34 @@ export class NodeFinishedEventHandler extends BaseEventHandler {
    */
   handle(
     eventData: StreamingEventData,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
     accumulatedText: string,
     lastContent: string
   ): EventHandlerResult {
     const nodeData = (eventData as NodeFinishedEvent).data;
     const text = nodeData.outputs.text;
     
-    // LLMノードの場合は最終結果として扱う
-    const isFinal = nodeData.node_type === 'llm';
+    // ノード完了イベントはノード出力として扱う（ワークフロー完了ではない）
+    const isNodeOutput = true;
+    const isWorkflowCompletion = false;
     
     // 改行のみのテキストも処理するように条件を変更
     if (text && (text.trim() || text.includes('\n'))) {
-      const sent = this.sendChunk(text, isFinal, onChunk, lastContent);
+      // ノードタイプに応じてチャンクタイプを設定
+      const chunkType = nodeData.node_type === 'llm' ? 'node_llm' : 'node_other';
+      
+      // JSONとして送信
+      const chunk = JSON.stringify({
+        type: chunkType,
+        content: text
+      });
+      
+      const sent = this.sendChunk(chunk, isWorkflowCompletion, onChunk, lastContent);
       
       return {
-        // 最終結果の場合は累積テキストをリセット
-        accumulatedText: isFinal ? '' : accumulatedText,
-        lastContent: sent ? text : lastContent,
+        // ノード出力なので累積テキストは維持
+        accumulatedText: accumulatedText,
+        lastContent: sent ? chunk : lastContent,
         handled: true
       };
     }

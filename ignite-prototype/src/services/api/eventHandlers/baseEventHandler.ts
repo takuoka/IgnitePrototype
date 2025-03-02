@@ -57,7 +57,7 @@ export interface IEventHandler {
    */
   handle(
     eventData: StreamingEventData,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
     accumulatedText: string,
     lastContent: string
   ): EventHandlerResult;
@@ -94,7 +94,7 @@ export abstract class BaseEventHandler implements IEventHandler {
    */
   abstract handle(
     eventData: StreamingEventData,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
     accumulatedText: string,
     lastContent: string
   ): EventHandlerResult;
@@ -102,15 +102,15 @@ export abstract class BaseEventHandler implements IEventHandler {
   /**
    * チャンクを送信する
    * @param content - 送信するコンテンツ
-   * @param isFinal - 最終結果かどうか
+   * @param isWorkflowCompletion - ワークフロー完了かどうか
    * @param onChunk - コールバック関数
    * @param lastContent - 前回送信したコンテンツ
    * @returns 送信されたかどうか
    */
   protected sendChunk(
     content: string,
-    isFinal: boolean,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
+    isWorkflowCompletion: boolean,
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
     lastContent: string
   ): boolean {
     // 重複チェック - 前回と同じ内容なら送信しない
@@ -123,7 +123,7 @@ export abstract class BaseEventHandler implements IEventHandler {
     }
     
     if (this.debug) {
-      console.log(`📤 [EventHandler] チャンク送信: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''} ${isFinal ? '(最終結果)' : ''}`);
+      console.log(`📤 [EventHandler] チャンク送信: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''} ${isWorkflowCompletion ? '(ワークフロー完了)' : ''}`);
       
       // チャンクの詳細ログ（改行を可視化）
       const contentWithVisibleNewlines = content.replace(/\n/g, '\\n');
@@ -137,7 +137,7 @@ export abstract class BaseEventHandler implements IEventHandler {
       console.log(`🔢 [EventHandler] チャンク文字コード: ${charCodes}`);
     }
     
-    onChunk(content, isFinal);
+    onChunk(content, isWorkflowCompletion);
     return true;
   }
 }

@@ -27,10 +27,16 @@ export interface EventHandler {
    */
   handleEvent(
     eventData: StreamingEventData,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
     accumulatedText: string,
     lastContent: string
   ): { accumulatedText: string; lastContent: string };
+  
+  /**
+   * セッションをリセットする
+   * 新しいセッションが開始されたときに呼び出す
+   */
+  resetSession?(): void;
 }
 
 /**
@@ -58,11 +64,19 @@ export class DifyEventHandler implements EventHandler {
    */
   handleEvent(
     eventData: StreamingEventData,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
     accumulatedText: string,
     lastContent: string
   ): { accumulatedText: string; lastContent: string } {
     return this.mainHandler.handleEvent(eventData, onChunk, accumulatedText, lastContent);
+  }
+  
+  /**
+   * セッションをリセットする
+   * 新しいセッションが開始されたときに呼び出す
+   */
+  resetSession(): void {
+    this.mainHandler.resetSession();
   }
 }
 

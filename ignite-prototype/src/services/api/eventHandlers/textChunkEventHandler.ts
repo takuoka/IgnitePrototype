@@ -6,6 +6,7 @@
 
 import type { StreamingEventData, TextChunkEvent } from '@/types';
 import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult } from './baseEventHandler';
+import { NodeStartedEventHandler } from './nodeStartedEventHandler';
 
 /**
  * テキストチャンクイベントハンドラー
@@ -13,13 +14,20 @@ import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult } f
 export class TextChunkEventHandler extends BaseEventHandler {
   // 前回のチャンクを保持する変数
   private previousChunk: string = '';
+  // ノード開始イベントハンドラーへの参照
+  private readonly nodeStartedHandler: NodeStartedEventHandler;
   
   /**
    * コンストラクタ
    * @param options - イベントハンドラーオプション
+   * @param nodeStartedHandler - ノード開始イベントハンドラー
    */
-  constructor(options: EventHandlerOptions = {}) {
+  constructor(
+    options: EventHandlerOptions = {},
+    nodeStartedHandler?: NodeStartedEventHandler
+  ) {
     super(options);
+    this.nodeStartedHandler = nodeStartedHandler || new NodeStartedEventHandler(options);
     
     if (this.debug) {
       console.log('🔧 [TextChunkEventHandler] ハンドラー初期化完了');
@@ -55,11 +63,12 @@ export class TextChunkEventHandler extends BaseEventHandler {
    */
   handle(
     eventData: StreamingEventData,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
     accumulatedText: string,
     lastContent: string
   ): EventHandlerResult {
-    let text = (eventData as TextChunkEvent).data.text;
+    const textChunkEvent = eventData as TextChunkEvent;
+    let text = textChunkEvent.data.text;
     
     // 前回のチャンクが見出し記号で終わっていた場合、現在のチャンクの先頭にスペースを挿入
     if (this.previousChunk && this.endsWithHeadingMarker(this.previousChunk) && text.trim() && !text.startsWith(' ')) {
@@ -69,16 +78,40 @@ export class TextChunkEventHandler extends BaseEventHandler {
       text = ' ' + text;
     }
     
+    // テキストチャンクイベントはワークフロー完了ではない
+    const isWorkflowCompletion = false;
+    
+    // from_variable_selectorからノードIDを取得
+    const variableSelector = textChunkEvent.data.from_variable_selector;
+    const nodeId = variableSelector && variableSelector.length > 0 ? variableSelector[0] : null;
+    
     // 改行のみのチャンクも処理するように条件を変更
     if (text && (text.trim() || text.includes('\n')) && text.trim().toLowerCase() !== 'stop') {
       // 現在のチャンクを保存
       this.previousChunk = text;
       
-      const sent = this.sendChunk(text, false, onChunk, lastContent);
+      // ノードIDから変数名を取得し、適切なタイプとして送信
+      let chunkType = 'legacy';
+      if (nodeId) {
+        chunkType = this.nodeStartedHandler.getVariableNameForNodeId(nodeId);
+        
+        if (this.debug) {
+          console.log(`🔍 [TextChunkEventHandler] ノードID ${nodeId} の変数名: ${chunkType}`);
+        }
+      }
+      
+      // JSONとして送信
+      const chunk = JSON.stringify({
+        type: chunkType,
+        content: text
+      });
+      
+      const sent = this.sendChunk(chunk, isWorkflowCompletion, onChunk, lastContent);
       
       return {
+        // 中間結果なので累積テキストは維持
         accumulatedText: sent ? accumulatedText + text : accumulatedText,
-        lastContent: sent ? text : lastContent,
+        lastContent: sent ? chunk : lastContent,
         handled: true
       };
     }

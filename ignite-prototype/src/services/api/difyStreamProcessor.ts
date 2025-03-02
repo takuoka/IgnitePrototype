@@ -29,7 +29,7 @@ export interface StreamProcessor {
    */
   processStream(
     reader: ReadableStreamDefaultReader<Uint8Array>,
-    onChunk: (chunk: string, isFinal?: boolean) => void
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void
   ): Promise<void>;
 }
 
@@ -68,10 +68,12 @@ export class DifyStreamProcessor implements StreamProcessor {
    */
   async processStream(
     reader: ReadableStreamDefaultReader<Uint8Array>,
-    onChunk: (chunk: string, isFinal?: boolean) => void
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void
   ): Promise<void> {
     let accumulatedText = '';
     let lastContent = '';
+    // ワークフロー完了イベントが処理されたかどうかを追跡
+    let workflowCompletionProcessed = false;
     
     try {
       // ストリーミングデータを逐次読み取る
@@ -79,13 +81,36 @@ export class DifyStreamProcessor implements StreamProcessor {
         const { done, value } = await reader.read();
         
         if (done) {
-          // 最後に累積テキストがあれば送信
-          // 改行のみのテキストも処理するように条件を変更
-          if (accumulatedText && accumulatedText !== lastContent && (accumulatedText.trim() || accumulatedText.includes('\n'))) {
-            if (this.debug) {
-              console.log(`🏁 [DifyStreamProcessor] ストリーム終了時の累積テキストを最終結果として送信`);
+          // ストリーム終了時の処理
+          if (this.debug) {
+            console.log(`🏁 [DifyStreamProcessor] ストリーム処理完了`);
+            
+            if (accumulatedText) {
+              console.log(`📝 [DifyStreamProcessor] 最終累積テキスト:`, accumulatedText);
             }
-            onChunk(accumulatedText, true);
+          }
+          
+          // ワークフロー完了イベントが処理されていない場合のみ、累積テキストを送信
+          if (!workflowCompletionProcessed && 
+              accumulatedText && 
+              accumulatedText !== lastContent && 
+              (accumulatedText.trim() || accumulatedText.includes('\n'))) {
+            
+            if (this.debug) {
+              console.log(`📤 [DifyStreamProcessor] ストリーム終了時に累積テキストを送信`);
+            }
+            
+            // 最終結果として送信
+            const finalChunk = JSON.stringify({
+              type: 'completion',
+              content: accumulatedText
+            });
+            
+            // 前回と同じ内容でなければ送信
+            if (finalChunk !== lastContent) {
+              const isWorkflowCompletion = true;
+              onChunk(finalChunk, isWorkflowCompletion);
+            }
           }
           break;
         }
@@ -95,6 +120,15 @@ export class DifyStreamProcessor implements StreamProcessor {
         
         // 各イベントを処理
         for (const eventData of events) {
+          // workflow_finishedイベントが来たらフラグを立てる
+          if (eventData.event === 'workflow_finished') {
+            workflowCompletionProcessed = true;
+            
+            if (this.debug) {
+              console.log(`🏁 [DifyStreamProcessor] ワークフロー完了イベントを検出`);
+            }
+          }
+          
           const result = this.eventHandler.handleEvent(eventData, onChunk, accumulatedText, lastContent);
           accumulatedText = result.accumulatedText;
           lastContent = result.lastContent;

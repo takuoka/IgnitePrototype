@@ -16,7 +16,7 @@ import { createStreamProcessor } from './difyStreamProcessor';
  */
 export const fetchDifyInspirationStream = async (
   lyrics: string,
-  onChunk: (chunk: string, isFinal?: boolean) => void
+  onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void
 ): Promise<void> => {
   console.log('🚀 [DifyService] ストリーミングAPI呼び出し開始');
   console.log('📝 [DifyService] 入力歌詞:', lyrics.substring(0, 100) + (lyrics.length > 100 ? '...' : ''));

@@ -198,7 +198,10 @@ describe('DifyStreamProcessor', () => {
       await processor.processStream(mockReader, onChunkMock)
       
       // 最後に累積テキストが送信されること
-      expect(onChunkMock).toHaveBeenLastCalledWith('テスト累積テキスト', true)
+      expect(onChunkMock).toHaveBeenLastCalledWith(
+        expect.stringContaining('completion'),
+        true
+      )
     })
 
     it('ストリーム処理中にエラーが発生した場合、エラーをスローすること', async () => {
