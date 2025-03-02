@@ -15,6 +15,8 @@ export default defineConfig({
     }
   },
   server: {
+    port: 5190, // ポート番号を5190に固定
+    strictPort: true, // 指定したポートが使用中の場合はエラーを出す
     proxy: {
       '/api': {
         target: 'https://api.dify.ai/v1',
