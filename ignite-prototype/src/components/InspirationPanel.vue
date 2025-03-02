@@ -50,18 +50,17 @@ const handleUpdateInspiration = async () => {
       v-html="renderedHtml"
     ></div>
     
-    <!-- 生成中インジケーター（テキストの下に表示） -->
-    <div v-if="isLoading || isGenerating" class="inline-indicator">
-      <div class="spinner-inline"></div>
-    </div>
-    
     <div class="button-container">
       <button 
         class="primary-button"
         @click="handleUpdateInspiration"
         :disabled="isLoading"
       >
-        {{ isLoading ? '生成中...' : '更新' }}
+        <span v-if="isLoading" class="button-content">
+          <span>生成中...</span>
+          <span class="spinner-inline"></span>
+        </span>
+        <span v-else>更新</span>
       </button>
     </div>
   </div>
@@ -100,21 +99,20 @@ const handleUpdateInspiration = async () => {
   box-shadow: none;
 }
 
-/* インラインインジケーター（テキストの下に表示） */
-.inline-indicator {
+/* ボタン内のコンテンツのスタイル */
+.button-content {
   display: flex;
-  justify-content: center;
   align-items: center;
-  margin: 1rem 0;
-  pointer-events: none; /* ユーザーの操作を妨げない */
+  justify-content: center;
+  gap: 8px;
 }
 
 .spinner-inline {
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
-  border-top-color: #3498db;
+  border-top-color: #ffffff;
   animation: spin 1s ease-in-out infinite;
 }
 

@@ -58,12 +58,13 @@ vi.mock('../InspirationPanel.vue', () => {
       template: `
         <div class="inspiration-panel">
           <div class="markdown-content" v-html="renderedHtml"></div>
-          <div v-if="isLoading || isGenerating" class="inline-indicator">
-            <div class="spinner-inline"></div>
-          </div>
           <div class="button-container">
-            <button @click="handleUpdateInspiration" :disabled="isLoading">
-              {{ isLoading ? '生成中...' : '更新' }}
+            <button @click="handleUpdateInspiration" :disabled="isLoading" class="primary-button">
+              <span v-if="isLoading" class="button-content">
+                <span>生成中...</span>
+                <span class="spinner-inline"></span>
+              </span>
+              <span v-else>更新</span>
             </button>
           </div>
         </div>
@@ -87,9 +88,9 @@ vi.mock('../InspirationPanel.vue', () => {
 
 // InspirationPanelコンポーネントのテスト
 describe('InspirationPanel', () => {
-  // ローディングインジケーターのテスト
-  describe('インラインインジケーター', () => {
-    it('ローディング中にインラインインジケーターが表示される', async () => {
+  // ボタン内ローディングインジケーターのテスト
+  describe('ボタン内ローディングインジケーター', () => {
+    it('ローディング中にボタン内にスピナーが表示される', async () => {
       // useInspirationSessionのモックを上書き
       const { useInspirationSession } = vi.mocked(await import('../../composables/useInspirationSession'))
       useInspirationSession.mockReturnValue({
@@ -123,51 +124,12 @@ describe('InspirationPanel', () => {
         }
       })
       
-      // インラインインジケーターが表示されていることを確認
-      expect(wrapper.find('.inline-indicator').exists()).toBe(true)
-      expect(wrapper.find('.inline-indicator').isVisible()).toBe(true)
+      // ボタン内にスピナーが表示されていることを確認
+      expect(wrapper.find('.primary-button .spinner-inline').exists()).toBe(true)
+      expect(wrapper.find('.primary-button').text()).toContain('生成中...')
     })
     
-    it('生成中にインラインインジケーターが表示される', async () => {
-      // useInspirationSessionのモックを上書き
-      const { useInspirationSession } = vi.mocked(await import('../../composables/useInspirationSession'))
-      useInspirationSession.mockReturnValue({
-        sessions: ref([]),
-        currentSession: ref({}),
-        isInitialState: ref(false),
-        isGenerating: ref(true),
-        renderedHtml: ref('<p>テスト</p>'),
-        isLoading: ref(false),
-        hasError: ref(false),
-        inspirationText: computed(() => 'テスト'),
-        updateInspiration: vi.fn(),
-        updateHtml: vi.fn(),
-        getState: vi.fn(() => ({
-          sessions: [],
-          currentSession: {},
-          isInitialState: false,
-          isGenerating: true,
-          isLoading: false,
-          hasError: false
-        }))
-      })
-      
-      // コンポーネントをマウント
-      const wrapper = mount(await import('../InspirationPanel.vue').then(m => m.default), {
-        global: {
-          stubs: {
-            // テンプレートをスタブ化せずに実際のテンプレートを使用
-            InspirationPanel: false
-          }
-        }
-      })
-      
-      // インラインインジケーターが表示されていることを確認
-      expect(wrapper.find('.inline-indicator').exists()).toBe(true)
-      expect(wrapper.find('.inline-indicator').isVisible()).toBe(true)
-    })
-    
-    it('ローディング中でも生成中でもない場合はインラインインジケーターが表示されない', async () => {
+    it('ローディング中でない場合はボタン内にスピナーが表示されない', async () => {
       // useInspirationSessionのモックを上書き
       const { useInspirationSession } = vi.mocked(await import('../../composables/useInspirationSession'))
       useInspirationSession.mockReturnValue({
@@ -201,8 +163,9 @@ describe('InspirationPanel', () => {
         }
       })
       
-      // インラインインジケーターが表示されていないことを確認
-      expect(wrapper.find('.inline-indicator').exists()).toBe(false)
+      // ボタン内にスピナーが表示されていないことを確認
+      expect(wrapper.find('.primary-button .spinner-inline').exists()).toBe(false)
+      expect(wrapper.find('.primary-button').text()).toBe('更新')
     })
   })
   
