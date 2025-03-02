@@ -24,6 +24,15 @@ export const TITLE_TO_VARIABLE_MAP: Record<string, string> = {
 };
 
 /**
+ * 変数名とセクションタイトルのマッピング
+ */
+export const VARIABLE_TO_TITLE_MAP: Record<string, string> = {
+  'advice': 'アドバイス',
+  'phrases': 'フレーズ',
+  'words': 'キーワード'
+};
+
+/**
  * 結果キーの配列
  * フィルタリングに使用するキー
  */

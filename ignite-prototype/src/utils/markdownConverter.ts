@@ -3,6 +3,7 @@
  */
 import { marked } from 'marked'
 import type { Session } from '@/types/inspiration'
+import { VARIABLE_NAMES, VARIABLE_TO_TITLE_MAP } from '@/services/api/constants'
 
 /**
  * セッションをマークダウンテキストに変換
@@ -12,17 +13,12 @@ import type { Session } from '@/types/inspiration'
 export const sessionToMarkdown = (session: Session): string => {
   const sections = []
   
-  if (session.advice) {
-    sections.push(`## アドバイス\n\n${session.advice}`)
-  }
-  
-  if (session.phrases) {
-    sections.push(`## フレーズ\n\n${session.phrases}`)
-  }
-  
-  if (session.words) {
-    sections.push(`## キーワード\n\n${session.words}`)
-  }
+  // 動的に各変数名に対応するセクションを生成
+  VARIABLE_NAMES.forEach(name => {
+    if (session[name]) {
+      sections.push(`## ${VARIABLE_TO_TITLE_MAP[name]}\n\n${session[name]}`)
+    }
+  })
   
   if (session.legacy) {
     sections.push(session.legacy)
