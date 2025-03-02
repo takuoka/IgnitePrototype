@@ -1,5 +1,6 @@
 // 既存の型定義をエクスポート
 export * from './inspiration'
+export * from './api'
 
 // その他の型定義
 
