@@ -6,11 +6,8 @@ import { fetchDifyInspirationStream } from '@/services/api/difyService'
 import { createEventHandler } from '@/services/api/difyEventHandler'
 import { createApiErrorMessage, logError } from '@/utils/errorHandler'
 import { sessionsToMarkdown, markdownToHtml } from '@/utils/markdownConverter'
-import { VARIABLE_NAMES } from '@/services/api/constants'
+import { VARIABLE_NAMES, EVENT_TYPES, UI_TEXTS } from '@/services/api/constants'
 import type { Session, ChunkData, SessionState, WorkflowOutputs } from '@/types/inspiration'
-
-// 初期表示用テキスト
-const INITIAL_TEXT = 'AIのインスピレーションがここに表示されます'
 
 // 空のセッションを作成
 const createEmptySession = (): Session => {
@@ -33,7 +30,7 @@ export function useInspirationSession() {
   const currentSession = ref<Session>(createEmptySession())
   const isInitialState = ref(true)
   const isGenerating = ref(false)
-  const renderedHtml = ref(markdownToHtml(INITIAL_TEXT))
+  const renderedHtml = ref(markdownToHtml(UI_TEXTS.INITIAL_TEXT))
   const isLoading = ref(false)
   const hasError = ref(false)
   
@@ -48,7 +45,7 @@ export function useInspirationSession() {
    */
   const inspirationText = computed(() => {
     if (isInitialState.value) {
-      return INITIAL_TEXT
+      return UI_TEXTS.INITIAL_TEXT
     }
     
     return sessionsToMarkdown(sessions.value, currentSession.value, isGenerating.value)
@@ -78,13 +75,13 @@ export function useInspirationSession() {
       
       // 必要なプロパティがない場合はlegacyとして扱う
       return {
-        type: 'legacy',
+        type: EVENT_TYPES.LEGACY,
         content: chunk
       }
     } catch (e) {
       // JSONではない場合はlegacyとして扱う
       return {
-        type: 'legacy',
+        type: EVENT_TYPES.LEGACY,
         content: chunk
       }
     }
@@ -113,13 +110,13 @@ export function useInspirationSession() {
     if (VARIABLE_NAMES.includes(type)) {
       // 対応するフィールドにテキストを累積
       currentSession.value[type] += parsedChunk.content as string;
-    } else if (type === 'legacy') {
+    } else if (type === EVENT_TYPES.LEGACY) {
       // legacyテキストを累積
       currentSession.value.legacy += parsedChunk.content as string;
-    } else if (type === 'node_llm' || type === 'node_other') {
+    } else if (type === EVENT_TYPES.NODE_LLM || type === EVENT_TYPES.NODE_OTHER) {
       // ノード完了イベントは中間結果として扱う（無視）
       // 何もしない
-    } else if (type === 'workflow_outputs') {
+    } else if (type === EVENT_TYPES.WORKFLOW_OUTPUTS) {
       // ワークフロー完了イベントは最終結果として扱う
       if (isWorkflowCompletion) {
         const outputs = parsedChunk.content as WorkflowOutputs;
@@ -132,14 +129,14 @@ export function useInspirationSession() {
         });
         
         // 処理済みとしてマーク
-        processedTypes.add('workflow_outputs');
+        processedTypes.add(EVENT_TYPES.WORKFLOW_OUTPUTS);
         
         // 他のタイプも処理済みとしてマーク（重複防止）
         VARIABLE_NAMES.forEach(name => {
           processedTypes.add(name);
         });
       }
-    } else if (type === 'completion') {
+    } else if (type === EVENT_TYPES.COMPLETION) {
       // 完了通知の場合
       if (isWorkflowCompletion) {
         // 完了通知の内容がある場合は処理
@@ -147,7 +144,7 @@ export function useInspirationSession() {
           currentSession.value.legacy += parsedChunk.content as string;
         }
         
-        processedTypes.add('completion');
+        processedTypes.add(EVENT_TYPES.COMPLETION);
       }
     }
     

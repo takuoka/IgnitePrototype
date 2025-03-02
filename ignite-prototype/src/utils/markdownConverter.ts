@@ -3,7 +3,7 @@
  */
 import { marked } from 'marked'
 import type { Session } from '@/types/inspiration'
-import { VARIABLE_NAMES, VARIABLE_TO_TITLE_MAP } from '@/services/api/constants'
+import { VARIABLE_NAMES, VARIABLE_TO_TITLE_MAP, UI_TEXTS } from '@/services/api/constants'
 
 /**
  * セッションをマークダウンテキストに変換
@@ -47,7 +47,7 @@ export const sessionsToMarkdown = (
   if (currentMarkdown) {
     markdownSections.push(currentMarkdown)
   } else if (isGenerating) {
-    markdownSections.push('## 生成中...')
+    markdownSections.push(UI_TEXTS.GENERATING_TEXT)
   }
   
   // すべてのセッションを結合

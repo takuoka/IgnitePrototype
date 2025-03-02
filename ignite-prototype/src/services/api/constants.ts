@@ -37,3 +37,22 @@ export const VARIABLE_TO_TITLE_MAP: Record<string, string> = {
  * フィルタリングに使用するキー
  */
 export const RESULT_KEYS = ['result', 'text', 'answer', 'content', ...VARIABLE_NAMES];
+
+/**
+ * イベントタイプ
+ */
+export const EVENT_TYPES = {
+  LEGACY: 'legacy',
+  NODE_LLM: 'node_llm',
+  NODE_OTHER: 'node_other',
+  WORKFLOW_OUTPUTS: 'workflow_outputs',
+  COMPLETION: 'completion'
+};
+
+/**
+ * UI表示用テキスト
+ */
+export const UI_TEXTS = {
+  INITIAL_TEXT: 'AIのインスピレーションがここに表示されます',
+  GENERATING_TEXT: '## 生成中...'
+};
