@@ -65,6 +65,20 @@ describe('difyService', () => {
       expect(mockStreamProcessor.processStream).toHaveBeenCalledWith(mockReader, mockOnChunk)
     })
 
+    it('global_instructionパラメータを含めてストリームを処理すること', async () => {
+      // テスト実行
+      await fetchDifyInspirationStream('テスト歌詞', '好きな歌詞', mockOnChunk, 'テスト指示')
+      
+      // 検証
+      expect(mockClient.sendStreamingRequest).toHaveBeenCalledWith({
+        currentLyric: 'テスト歌詞',
+        favorite_lyrics: '好きな歌詞',
+        global_instruction: 'テスト指示'
+      })
+      
+      expect(mockStreamProcessor.processStream).toHaveBeenCalledWith(mockReader, mockOnChunk)
+    })
+
     it('空の歌詞が渡された場合、デフォルトメッセージを使用すること', async () => {
       // テスト実行
       await fetchDifyInspirationStream('', '', mockOnChunk)

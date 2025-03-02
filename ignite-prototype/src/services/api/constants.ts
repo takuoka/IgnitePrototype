@@ -7,12 +7,12 @@
 /**
  * 入力変数名の配列
  */
-export const INPUT_VARIABLE_NAMES = ['currentLyric', 'favorite_lyrics'];
+export const INPUT_VARIABLE_NAMES = ['currentLyric', 'favorite_lyrics', 'global_instruction'];
 
 /**
  * 出力変数名の配列
  */
-export const VARIABLE_NAMES = ['advice', 'phrases', 'words'];
+export const VARIABLE_NAMES = ['advice', 'phrases', 'words', 'lyric', 'final_phrase'];
 
 /**
  * ノードタイトルとセッション変数のマッピング
@@ -22,10 +22,14 @@ export const TITLE_TO_VARIABLE_MAP: Record<string, string> = {
   'アドバイス': 'advice',
   'フレーズ': 'phrases',
   'ワード': 'words',
+  '歌詞': 'lyric',
+  '最終フレーズ': 'final_phrase',
   // 英語タイトル
   'advice': 'advice',
   'phrases': 'phrases',
-  'words': 'words'
+  'words': 'words',
+  'lyric': 'lyric',
+  'final_phrase': 'final_phrase'
 };
 
 /**
@@ -34,7 +38,9 @@ export const TITLE_TO_VARIABLE_MAP: Record<string, string> = {
 export const VARIABLE_TO_TITLE_MAP: Record<string, string> = {
   'advice': 'アドバイス',
   'phrases': 'フレーズ',
-  'words': 'キーワード'
+  'words': 'キーワード',
+  'lyric': '歌詞',
+  'final_phrase': '最終フレーズ'
 };
 
 /**

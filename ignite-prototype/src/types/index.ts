@@ -13,6 +13,9 @@ export interface LyricsEditorInterface {
   favoriteLyrics: {
     get: () => string;
   };
+  globalInstruction: {
+    get: () => string;
+  };
 }
 
 /**
@@ -22,6 +25,7 @@ export interface DifyAPIRequest {
   inputs: {
     currentLyric: string;
     favorite_lyrics?: string;
+    global_instruction?: string;
   };
   user: string;
   response_mode: string;

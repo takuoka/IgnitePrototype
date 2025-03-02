@@ -165,8 +165,14 @@ export function useInspirationSession() {
    * @param lyrics 歌詞
    * @param favoriteLyrics 好きな歌詞
    * @param onUpdate 更新時のコールバック
+   * @param globalInstruction ユーザー指示
    */
-  const updateInspiration = async (lyrics: string = '', favoriteLyrics: string = '', onUpdate?: () => void) => {
+  const updateInspiration = async (
+    lyrics: string = '', 
+    favoriteLyrics: string = '', 
+    onUpdate?: () => void,
+    globalInstruction: string = ''
+  ) => {
     try {
       isLoading.value = true
       hasError.value = false
@@ -199,15 +205,20 @@ export function useInspirationSession() {
       const processedTypes = new Set<string>()
       
       // ストリーミングモードでAPI呼び出し
-      await fetchDifyInspirationStream(lyrics, favoriteLyrics, (chunk: string, isWorkflowCompletion?: boolean) => {
-        processChunk(chunk, !!isWorkflowCompletion, processedTypes)
-        if (onUpdate) onUpdate()
-        
-        // ワークフロー完了が届いたら生成終了
-        if (isWorkflowCompletion && processedTypes.size > 0) {
-          isGenerating.value = false
-        }
-      })
+      await fetchDifyInspirationStream(
+        lyrics, 
+        favoriteLyrics, 
+        (chunk: string, isWorkflowCompletion?: boolean) => {
+          processChunk(chunk, !!isWorkflowCompletion, processedTypes)
+          if (onUpdate) onUpdate()
+          
+          // ワークフロー完了が届いたら生成終了
+          if (isWorkflowCompletion && processedTypes.size > 0) {
+            isGenerating.value = false
+          }
+        },
+        globalInstruction
+      )
       
       // ストリーミングが終了しても最終結果が届いていない場合
       if (isGenerating.value) {

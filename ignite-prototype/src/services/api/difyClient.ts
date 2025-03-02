@@ -21,6 +21,7 @@ export interface DifyClient {
   sendStreamingRequest(inputs: { 
     currentLyric: string;
     favorite_lyrics?: string;
+    global_instruction?: string;
   }): Promise<{
     response: Response;
     reader: ReadableStreamDefaultReader<Uint8Array>;
@@ -61,6 +62,7 @@ export class DifyApiClient implements DifyClient {
   async sendStreamingRequest(inputs: { 
     currentLyric: string;
     favorite_lyrics?: string;
+    global_instruction?: string;
   }): Promise<{
     response: Response;
     reader: ReadableStreamDefaultReader<Uint8Array>;

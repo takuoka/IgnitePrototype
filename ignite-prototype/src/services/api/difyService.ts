@@ -14,15 +14,18 @@ import { createStreamProcessor } from './difyStreamProcessor';
  * @param lyrics - モチベーション生成の元となる歌詞
  * @param favoriteLyrics - 好きな歌詞
  * @param onChunk - 各チャンク受信時に呼ばれるコールバック関数
+ * @param globalInstruction - ユーザー指示
  */
 export const fetchDifyInspirationStream = async (
   lyrics: string,
   favoriteLyrics: string = '',
-  onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void
+  onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
+  globalInstruction: string = ''
 ): Promise<void> => {
   console.log('🚀 [DifyService] ストリーミングAPI呼び出し開始');
   console.log('📝 [DifyService] 入力歌詞:', lyrics.substring(0, 100) + (lyrics.length > 100 ? '...' : ''));
   console.log('📝 [DifyService] 好きな歌詞:', favoriteLyrics.substring(0, 100) + (favoriteLyrics.length > 100 ? '...' : ''));
+  console.log('📝 [DifyService] ユーザー指示:', globalInstruction.substring(0, 100) + (globalInstruction.length > 100 ? '...' : ''));
   
   try {
     // クライアントとストリームプロセッサを作成
@@ -30,10 +33,19 @@ export const fetchDifyInspirationStream = async (
     const streamProcessor = createStreamProcessor({ debug: true }); // デバッグモードを有効化
     
     // リクエストデータの準備
-    const inputs = {
+    const inputs: {
+      currentLyric: string;
+      favorite_lyrics: string;
+      global_instruction?: string;
+    } = {
       currentLyric: lyrics || '歌詞を入力してください',
       favorite_lyrics: favoriteLyrics
     };
+
+    // ユーザー指示が存在する場合は追加
+    if (globalInstruction) {
+      inputs.global_instruction = globalInstruction;
+    }
     
     // ストリーミングリクエストを送信
     const { reader } = await client.sendStreamingRequest(inputs);

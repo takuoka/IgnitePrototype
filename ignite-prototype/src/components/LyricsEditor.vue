@@ -5,7 +5,8 @@ import type { LyricsEditorInterface } from '@/types'
 // localStorageから初期値を読み込む
 const lyrics = ref(localStorage.getItem('lyrics') || '')
 const favoriteLyrics = ref(localStorage.getItem('favoriteLyrics') || '')
-const activeTab = ref('current') // 'current' or 'favorite'
+const globalInstruction = ref(localStorage.getItem('globalInstruction') || '')
+const activeTab = ref('current') // 'current', 'favorite', or 'instruction'
 
 // 歌詞が変更されたらlocalStorageに保存
 watch(lyrics, (newValue) => {
@@ -17,6 +18,11 @@ watch(favoriteLyrics, (newValue) => {
   localStorage.setItem('favoriteLyrics', newValue)
 })
 
+// ユーザー指示が変更されたらlocalStorageに保存
+watch(globalInstruction, (newValue) => {
+  localStorage.setItem('globalInstruction', newValue)
+})
+
 // Expose the interface for parent components
 defineExpose<LyricsEditorInterface>({
   lyrics: {
@@ -24,6 +30,9 @@ defineExpose<LyricsEditorInterface>({
   },
   favoriteLyrics: {
     get: () => favoriteLyrics.value
+  },
+  globalInstruction: {
+    get: () => globalInstruction.value
   }
 })
 </script>
@@ -45,6 +54,13 @@ defineExpose<LyricsEditorInterface>({
       >
         好きな歌詞
       </button>
+      <button 
+        class="tab-button" 
+        :class="{ active: activeTab === 'instruction' }"
+        @click="activeTab = 'instruction'"
+      >
+        ユーザー指示
+      </button>
     </div>
     
     <div class="tab-content">
@@ -60,6 +76,14 @@ defineExpose<LyricsEditorInterface>({
         v-if="activeTab === 'favorite'"
         v-model="favoriteLyrics"
         placeholder="ここに好きな歌詞を書いてください..."
+        class="editor-textarea card custom-scrollbar"
+        spellcheck="false"
+      ></textarea>
+      
+      <textarea
+        v-if="activeTab === 'instruction'"
+        v-model="globalInstruction"
+        placeholder="ここにAIへの指示を書いてください..."
         class="editor-textarea card custom-scrollbar"
         spellcheck="false"
       ></textarea>

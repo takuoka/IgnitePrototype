@@ -8,6 +8,7 @@ const lyricsEditorRef = ref<LyricsEditorInterface | null>(null)
 
 const currentLyrics = computed(() => lyricsEditorRef.value?.lyrics.get() || '')
 const favoriteLyrics = computed(() => lyricsEditorRef.value?.favoriteLyrics.get() || '')
+const globalInstruction = computed(() => lyricsEditorRef.value?.globalInstruction.get() || '')
 
 const handleUpdateInspiration = () => {
   // イベントを受け取るだけ
@@ -23,6 +24,7 @@ const handleUpdateInspiration = () => {
       <InspirationPanel 
         :lyrics="currentLyrics"
         :favorite-lyrics="favoriteLyrics"
+        :global-instruction="globalInstruction"
         @update="handleUpdateInspiration"
       />
     </div>
