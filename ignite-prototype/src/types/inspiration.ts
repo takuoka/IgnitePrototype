@@ -1,24 +1,31 @@
 /**
  * インスピレーション関連の型定義
  */
+import { VARIABLE_NAMES } from '@/services/api/constants';
 
 /**
  * セッションデータ
+ * 基本フィールド（legacy）と動的フィールド（VARIABLE_NAMESに基づく）を持つ
  */
 export interface Session {
-  advice: string
-  phrases: string
-  words: string
-  legacy: string
+  legacy: string;
+  [key: string]: string; // 動的フィールド用
 }
 
 /**
  * ワークフロー出力データ
+ * VARIABLE_NAMESに基づく動的フィールドを持つ
  */
 export interface WorkflowOutputs {
-  advice: string
-  phrases: string
-  words: string
+  [key: string]: string;
+}
+
+/**
+ * 型安全性のためのユーティリティ関数
+ * 指定されたキーがVARIABLE_NAMESに含まれているかチェック
+ */
+export function isValidVariableName(key: string): boolean {
+  return VARIABLE_NAMES.includes(key);
 }
 
 /**

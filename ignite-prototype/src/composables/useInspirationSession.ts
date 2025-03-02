@@ -6,18 +6,23 @@ import { fetchDifyInspirationStream } from '@/services/api/difyService'
 import { createEventHandler } from '@/services/api/difyEventHandler'
 import { createApiErrorMessage, logError } from '@/utils/errorHandler'
 import { sessionsToMarkdown, markdownToHtml } from '@/utils/markdownConverter'
+import { VARIABLE_NAMES } from '@/services/api/constants'
 import type { Session, ChunkData, SessionState, WorkflowOutputs } from '@/types/inspiration'
 
 // 初期表示用テキスト
 const INITIAL_TEXT = 'AIのインスピレーションがここに表示されます'
 
 // 空のセッションを作成
-const createEmptySession = (): Session => ({
-  advice: '',
-  phrases: '',
-  words: '',
-  legacy: ''
-})
+const createEmptySession = (): Session => {
+  const session: Session = { legacy: '' };
+  
+  // 動的に変数名に基づいてフィールドを初期化
+  VARIABLE_NAMES.forEach(name => {
+    session[name] = '';
+  });
+  
+  return session;
+}
 
 /**
  * インスピレーションセッション管理のコンポーザブル
@@ -102,67 +107,60 @@ export function useInspirationSession() {
     }
     
     // チャンクのタイプに応じて適切な状態を更新
-    switch (parsedChunk.type) {
-      case 'advice':
-        // adviceテキストを累積
-        currentSession.value.advice += parsedChunk.content as string
-        break
-      case 'phrases':
-        // phrasesテキストを累積
-        currentSession.value.phrases += parsedChunk.content as string
-        break
-      case 'words':
-        // wordsテキストを累積
-        currentSession.value.words += parsedChunk.content as string
-        break
-      case 'legacy':
-        // legacyテキストを累積
-        currentSession.value.legacy += parsedChunk.content as string
-        break
-      case 'node_llm':
-      case 'node_other':
-        // ノード完了イベントは中間結果として扱う（無視）
-        break
-      case 'workflow_outputs':
-        // ワークフロー完了イベントは最終結果として扱う
-        if (isWorkflowCompletion) {
-          const outputs = parsedChunk.content as WorkflowOutputs
-          if (outputs.advice) currentSession.value.advice = outputs.advice
-          if (outputs.phrases) currentSession.value.phrases = outputs.phrases
-          if (outputs.words) currentSession.value.words = outputs.words
-          
-          // 処理済みとしてマーク
-          processedTypes.add('workflow_outputs')
-          
-          // 他のタイプも処理済みとしてマーク（重複防止）
-          processedTypes.add('advice')
-          processedTypes.add('phrases')
-          processedTypes.add('words')
-        }
-        break
-      case 'completion':
-        // 完了通知の場合
-        if (isWorkflowCompletion) {
-          // 完了通知の内容がある場合は処理
-          if (typeof parsedChunk.content === 'string' && parsedChunk.content.trim()) {
-            currentSession.value.legacy += parsedChunk.content as string
+    const type = parsedChunk.type;
+    
+    // 変数名に一致するタイプの場合
+    if (VARIABLE_NAMES.includes(type)) {
+      // 対応するフィールドにテキストを累積
+      currentSession.value[type] += parsedChunk.content as string;
+    } else if (type === 'legacy') {
+      // legacyテキストを累積
+      currentSession.value.legacy += parsedChunk.content as string;
+    } else if (type === 'node_llm' || type === 'node_other') {
+      // ノード完了イベントは中間結果として扱う（無視）
+      // 何もしない
+    } else if (type === 'workflow_outputs') {
+      // ワークフロー完了イベントは最終結果として扱う
+      if (isWorkflowCompletion) {
+        const outputs = parsedChunk.content as WorkflowOutputs;
+        
+        // 動的に各変数名に対応する出力を設定
+        VARIABLE_NAMES.forEach(name => {
+          if (outputs[name]) {
+            currentSession.value[name] = outputs[name];
           }
-          
-          processedTypes.add('completion')
+        });
+        
+        // 処理済みとしてマーク
+        processedTypes.add('workflow_outputs');
+        
+        // 他のタイプも処理済みとしてマーク（重複防止）
+        VARIABLE_NAMES.forEach(name => {
+          processedTypes.add(name);
+        });
+      }
+    } else if (type === 'completion') {
+      // 完了通知の場合
+      if (isWorkflowCompletion) {
+        // 完了通知の内容がある場合は処理
+        if (typeof parsedChunk.content === 'string' && parsedChunk.content.trim()) {
+          currentSession.value.legacy += parsedChunk.content as string;
         }
-        break
+        
+        processedTypes.add('completion');
+      }
     }
     
     // 処理したチャンクを記録
-    lastProcessedChunk.value = chunk
+    lastProcessedChunk.value = chunk;
     
     // ワークフロー完了の場合は処理済みとしてマーク
     if (isWorkflowCompletion) {
-      processedTypes.add(parsedChunk.type)
+      processedTypes.add(parsedChunk.type);
     }
     
     // HTMLを更新
-    updateHtml()
+    updateHtml();
   }
   
   /**
