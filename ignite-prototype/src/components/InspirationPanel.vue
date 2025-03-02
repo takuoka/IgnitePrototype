@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref, watch, onUnmounted } from 'vue'
 import { useInspirationSession } from '@/composables/useInspirationSession'
 
 // Props and emits
@@ -20,20 +20,78 @@ const {
   updateHtml
 } = useInspirationSession()
 
+// マークダウンコンテンツへの参照
+const markdownContentRef = ref<HTMLElement | null>(null)
+
+// 自動スクロールの制御
+const autoScrollEnabled = ref(true)
+let autoScrollTimer: number | null = null
+
+// ユーザーがスクロールしたときのハンドラー
+const handleUserScroll = () => {
+  // 自動スクロールを一時的に無効化
+  autoScrollEnabled.value = false
+  
+  // 既存のタイマーをクリア
+  if (autoScrollTimer !== null) {
+    clearTimeout(autoScrollTimer)
+  }
+  
+  // 一定時間後に自動スクロールを再度有効化
+  autoScrollTimer = window.setTimeout(() => {
+    autoScrollEnabled.value = true
+  }, 3000) // 3秒後に再度有効化
+}
+
+// スクロールを一番下に移動する関数
+const scrollToBottom = () => {
+  if (markdownContentRef.value && autoScrollEnabled.value) {
+    markdownContentRef.value.scrollTo({
+      top: markdownContentRef.value.scrollHeight,
+      behavior: 'smooth'
+    })
+  }
+}
+
+// HTMLが更新されたときにスクロール位置を調整
+watch(renderedHtml, () => {
+  // 次のティックでDOMが更新された後にスクロール
+  setTimeout(scrollToBottom, 0)
+})
+
 // 更新時のコールバック
 const handleUpdate = () => {
   emit('update')
 }
 
-// 初期化時にレンダリング
+// 初期化時にレンダリングとイベントリスナーの設定
 onMounted(() => {
   updateHtml()
+  
+  // スクロールイベントリスナーを追加
+  if (markdownContentRef.value) {
+    markdownContentRef.value.addEventListener('scroll', handleUserScroll)
+  }
+})
+
+// コンポーネントのアンマウント時にイベントリスナーとタイマーをクリーンアップ
+onUnmounted(() => {
+  if (markdownContentRef.value) {
+    markdownContentRef.value.removeEventListener('scroll', handleUserScroll)
+  }
+  
+  if (autoScrollTimer !== null) {
+    clearTimeout(autoScrollTimer)
+  }
 })
 
 /**
  * インスピレーションを更新
  */
 const handleUpdateInspiration = async () => {
+  // 更新ボタンが押されたら自動スクロールを有効化
+  autoScrollEnabled.value = true
+  
   await updateInspiration(
     props.lyrics || '', 
     props.favoriteLyrics || '', 
@@ -46,6 +104,7 @@ const handleUpdateInspiration = async () => {
 <template>
   <div class="inspiration-panel">
     <div 
+      ref="markdownContentRef"
       class="markdown-content card custom-scrollbar"
       v-html="renderedHtml"
     ></div>
