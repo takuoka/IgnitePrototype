@@ -116,16 +116,24 @@ describe('DifyStreamProcessor', () => {
       // イベントハンドラーのモック設定
       mockEventHandler.handleEvent.mockImplementation((eventData, onChunk, accumulatedText, lastContent) => {
         if (eventData.event === 'text_chunk') {
-          onChunk((eventData as TextChunkEvent).data.text, false)
+          const expectedChunk = JSON.stringify({
+            type: 'legacy',
+            content: (eventData as TextChunkEvent).data.text
+          })
+          onChunk(expectedChunk, false)
           return {
             accumulatedText: accumulatedText + (eventData as TextChunkEvent).data.text,
-            lastContent: (eventData as TextChunkEvent).data.text
+            lastContent: expectedChunk
           }
         } else if (eventData.event === 'node_finished') {
-          onChunk((eventData as NodeFinishedEvent).data.outputs.text, true)
+          const expectedChunk = JSON.stringify({
+            type: 'node_llm',
+            content: (eventData as NodeFinishedEvent).data.outputs.text
+          })
+          onChunk(expectedChunk, false)
           return {
             accumulatedText: '',
-            lastContent: (eventData as NodeFinishedEvent).data.outputs.text
+            lastContent: expectedChunk
           }
         }
         return { accumulatedText, lastContent }
@@ -160,7 +168,12 @@ describe('DifyStreamProcessor', () => {
         '',
         ''
       )
-      expect(onChunkMock).toHaveBeenCalledWith('テストテキスト', false)
+      
+      const expectedChunk = JSON.stringify({
+        type: 'legacy',
+        content: 'テストテキスト'
+      })
+      expect(onChunkMock).toHaveBeenCalledWith(expectedChunk, false)
     })
 
     it('複数のイベントを含むストリームを処理すること', async () => {

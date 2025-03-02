@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { TextChunkEventHandler } from '../eventHandlers/textChunkEventHandler'
 import type { TextChunkEvent } from '../../../types'
+import type { EventHandlerState, EventHandlerResult } from '../eventHandlers/baseEventHandler'
 
 describe('TextChunkEventHandler', () => {
   it('インスタンス化できること', () => {
@@ -20,16 +21,22 @@ describe('TextChunkEventHandler', () => {
       }
     }
     
-    const result = handler.handle(event, onChunkMock, '', '')
+    const initialState: EventHandlerState = { accumulatedText: '', lastContent: '' }
+    const result = handler.handle(event, onChunkMock, initialState)
     
-    expect(onChunkMock).toHaveBeenCalledWith('テストテキスト', false)
-    expect(result.accumulatedText).toBe('テストテキスト')
-    expect(result.lastContent).toBe('テストテキスト')
+    // JSONオブジェクトとして送信されることを確認
+    const expectedChunk = JSON.stringify({
+      type: 'legacy',
+      content: 'テストテキスト'
+    })
+    expect(onChunkMock).toHaveBeenCalledWith(expectedChunk, false)
+    expect(result.state.accumulatedText).toBe('テストテキスト')
+    expect(result.state.lastContent).toBe(expectedChunk)
     expect(result.handled).toBe(true)
   })
   
   it('見出し記号で終わるチャンクの後に、次のチャンクの先頭にスペースを挿入すること', () => {
-    const handler = new TextChunkEventHandler({ debug: true })
+    const handler = new TextChunkEventHandler()
     const onChunkMock = vi.fn()
     
     // 見出し記号で終わるチャンク
@@ -51,14 +58,22 @@ describe('TextChunkEventHandler', () => {
     }
     
     // 最初のチャンクを処理
-    handler.handle(event1, onChunkMock, '', '')
+    const initialState: EventHandlerState = { accumulatedText: '', lastContent: '' }
+    const firstResult = handler.handle(event1, onChunkMock, initialState)
     
     // 次のチャンクを処理
-    const result = handler.handle(event2, onChunkMock, '##', '##')
+    const secondResult = handler.handle(event2, onChunkMock, {
+      accumulatedText: '##',
+      lastContent: firstResult.state.lastContent
+    })
     
     // 次のチャンクの先頭にスペースが挿入されていること
-    expect(onChunkMock).toHaveBeenCalledWith(' 見出し', false)
-    expect(result.lastContent).toBe(' 見出し')
+    const expectedChunk = JSON.stringify({
+      type: 'legacy',
+      content: ' 見出し'
+    })
+    expect(onChunkMock).toHaveBeenCalledWith(expectedChunk, false)
+    expect(secondResult.state.lastContent).toBe(expectedChunk)
   })
   
   it('見出し記号で終わらないチャンクの後は、次のチャンクの先頭にスペースを挿入しないこと', () => {
@@ -84,14 +99,22 @@ describe('TextChunkEventHandler', () => {
     }
     
     // 最初のチャンクを処理
-    handler.handle(event1, onChunkMock, '', '')
+    const initialState: EventHandlerState = { accumulatedText: '', lastContent: '' }
+    const firstResult = handler.handle(event1, onChunkMock, initialState)
     
     // 次のチャンクを処理
-    const result = handler.handle(event2, onChunkMock, 'テキスト', 'テキスト')
+    const secondResult = handler.handle(event2, onChunkMock, {
+      accumulatedText: 'テキスト',
+      lastContent: firstResult.state.lastContent
+    })
     
     // 次のチャンクの先頭にスペースが挿入されていないこと
-    expect(onChunkMock).toHaveBeenCalledWith('続き', false)
-    expect(result.lastContent).toBe('続き')
+    const expectedChunk = JSON.stringify({
+      type: 'legacy',
+      content: '続き'
+    })
+    expect(onChunkMock).toHaveBeenCalledWith(expectedChunk, false)
+    expect(secondResult.state.lastContent).toBe(expectedChunk)
   })
   
   it('既にスペースで始まるチャンクには、追加のスペースを挿入しないこと', () => {
@@ -117,13 +140,21 @@ describe('TextChunkEventHandler', () => {
     }
     
     // 最初のチャンクを処理
-    handler.handle(event1, onChunkMock, '', '')
+    const initialState: EventHandlerState = { accumulatedText: '', lastContent: '' }
+    const firstResult = handler.handle(event1, onChunkMock, initialState)
     
     // 次のチャンクを処理
-    const result = handler.handle(event2, onChunkMock, '##', '##')
+    const secondResult = handler.handle(event2, onChunkMock, {
+      accumulatedText: '##',
+      lastContent: firstResult.state.lastContent
+    })
     
     // 次のチャンクの先頭に追加のスペースが挿入されていないこと
-    expect(onChunkMock).toHaveBeenCalledWith(' 見出し', false)
-    expect(result.lastContent).toBe(' 見出し')
+    const expectedChunk = JSON.stringify({
+      type: 'legacy',
+      content: ' 見出し'
+    })
+    expect(onChunkMock).toHaveBeenCalledWith(expectedChunk, false)
+    expect(secondResult.state.lastContent).toBe(expectedChunk)
   })
 })

@@ -69,20 +69,33 @@ export class DifyStreamProcessor implements StreamProcessor {
       this.eventHandler.resetSession();
     }
     
+    // 状態を追跡
+    let accumulatedText = '';
+    let lastContent = '';
+    
     try {
       // ストリーミングデータを逐次読み取る
       while (true) {
         const { done, value } = await reader.read();
         
         if (done) {
-          // ストリーム終了
+          // ストリーム終了時に累積テキストがあれば送信
+          if (accumulatedText) {
+            const completionChunk = JSON.stringify({
+              type: 'completion',
+              content: accumulatedText
+            });
+            onChunk(completionChunk, true);
+          }
           break;
         }
         
         // ストリームデータを解析して各イベントを処理
         const events = this.streamParser.parseChunk(value);
         for (const eventData of events) {
-          this.eventHandler.handleEvent(eventData, onChunk, '', '');
+          const result = this.eventHandler.handleEvent(eventData, onChunk, accumulatedText, lastContent);
+          accumulatedText = result.accumulatedText;
+          lastContent = result.lastContent;
         }
       }
     } catch (error) {

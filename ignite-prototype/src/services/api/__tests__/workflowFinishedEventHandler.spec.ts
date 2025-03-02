@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { WorkflowFinishedEventHandler } from '../eventHandlers/workflowFinishedEventHandler'
 import type { WorkflowFinishedEvent } from '../../../types'
 import { DifyContentFilter } from '../eventHandlers/contentFilter'
+import type { EventHandlerState, EventHandlerResult } from '../eventHandlers/baseEventHandler'
 
 describe('WorkflowFinishedEventHandler', () => {
   // テスト用のモックデータ
@@ -47,6 +48,7 @@ describe('WorkflowFinishedEventHandler', () => {
   let handler: WorkflowFinishedEventHandler
   let onChunkMock: any
   let contentFilterMock: any
+  let initialState: EventHandlerState
 
   beforeEach(() => {
     onChunkMock = vi.fn()
@@ -54,6 +56,7 @@ describe('WorkflowFinishedEventHandler', () => {
       shouldIgnoreData: vi.fn().mockReturnValue(false)
     }
     handler = new WorkflowFinishedEventHandler({ debug: true }, contentFilterMock)
+    initialState = { accumulatedText: '', lastContent: '' }
   })
 
   describe('canHandle', () => {
@@ -89,16 +92,15 @@ describe('WorkflowFinishedEventHandler', () => {
       const result = handler.handle(
         mockWorkflowFinishedEvent,
         onChunkMock,
-        '',
-        ''
+        initialState
       )
 
       expect(onChunkMock).toHaveBeenCalledWith(
         expect.stringContaining('ワークフロー完了結果'),
         true
       )
-      expect(result.accumulatedText).toBe('')
-      expect(result.lastContent).not.toBe('')
+      expect(result.state.accumulatedText).toBe('')
+      expect(result.state.lastContent).not.toBe('')
       expect(result.handled).toBe(true)
     })
 
@@ -106,16 +108,15 @@ describe('WorkflowFinishedEventHandler', () => {
       const result = handler.handle(
         mockMultiOutputWorkflowFinishedEvent,
         onChunkMock,
-        '',
-        ''
+        initialState
       )
 
       expect(onChunkMock).toHaveBeenCalledWith(
         expect.any(String),
         true
       )
-      expect(result.accumulatedText).toBe('')
-      expect(result.lastContent).not.toBe('')
+      expect(result.state.accumulatedText).toBe('')
+      expect(result.state.lastContent).not.toBe('')
       expect(result.handled).toBe(true)
     })
 
@@ -124,8 +125,7 @@ describe('WorkflowFinishedEventHandler', () => {
       const firstResult = handler.handle(
         mockWorkflowFinishedEvent,
         onChunkMock,
-        '',
-        ''
+        initialState
       )
       
       // 同じ内容で2回目の呼び出し
@@ -133,12 +133,14 @@ describe('WorkflowFinishedEventHandler', () => {
       const secondResult = handler.handle(
         mockWorkflowFinishedEvent,
         onChunkMock,
-        '',
-        firstResult.lastContent
+        {
+          accumulatedText: '',
+          lastContent: firstResult.state.lastContent
+        }
       )
       
       expect(onChunkMock).not.toHaveBeenCalled()
-      expect(secondResult.lastContent).toBe(firstResult.lastContent)
+      expect(secondResult.state.lastContent).toBe(firstResult.state.lastContent)
       expect(secondResult.handled).toBe(true)
     })
 
@@ -147,8 +149,7 @@ describe('WorkflowFinishedEventHandler', () => {
       handler.handle(
         mockWorkflowFinishedEvent,
         onChunkMock,
-        '',
-        ''
+        initialState
       )
       
       // 同じイベントで2回目の呼び出し
@@ -166,8 +167,7 @@ describe('WorkflowFinishedEventHandler', () => {
       const result = handler.handle(
         duplicateEvent,
         onChunkMock,
-        '',
-        ''
+        initialState
       )
       
       // 2回目は処理されるが、onChunkは呼ばれないことを期待

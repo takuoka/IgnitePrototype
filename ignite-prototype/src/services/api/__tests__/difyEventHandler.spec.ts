@@ -183,9 +183,13 @@ describe('DifyEventHandler', () => {
     it('text_chunkイベントを処理すること', () => {
       const result = handler.handleEvent(mockTextChunkEvent, onChunkMock, '', '')
       
-      expect(onChunkMock).toHaveBeenCalledWith('テストテキスト', false)
+      const expectedChunk = JSON.stringify({
+        type: 'legacy',
+        content: 'テストテキスト'
+      })
+      expect(onChunkMock).toHaveBeenCalledWith(expectedChunk, false)
       expect(result.accumulatedText).toBe('テストテキスト')
-      expect(result.lastContent).toBe('テストテキスト')
+      expect(result.lastContent).toBe(expectedChunk)
     })
 
     it('node_finishedイベント（llmタイプ）を処理すること', () => {
@@ -214,7 +218,14 @@ describe('DifyEventHandler', () => {
     })
 
     it('前回と同じ内容のチャンクは送信しないこと', () => {
-      handler.handleEvent(mockTextChunkEvent, onChunkMock, '', 'テストテキスト')
+      // 最初に正しいJSONフォーマットの文字列を作成
+      const expectedChunk = JSON.stringify({
+        type: 'legacy',
+        content: 'テストテキスト'
+      })
+      
+      // 前回と同じ内容のチャンクを送信
+      handler.handleEvent(mockTextChunkEvent, onChunkMock, '', expectedChunk)
       
       expect(onChunkMock).not.toHaveBeenCalled()
     })
@@ -258,7 +269,11 @@ describe('DifyEventHandler', () => {
       
       handler.handleEvent(newlineTextChunkEvent, onChunkMock, '', '')
       
-      expect(onChunkMock).toHaveBeenCalledWith('\n', false)
+      const expectedChunk = JSON.stringify({
+        type: 'legacy',
+        content: '\n'
+      })
+      expect(onChunkMock).toHaveBeenCalledWith(expectedChunk, false)
     })
   })
 })
