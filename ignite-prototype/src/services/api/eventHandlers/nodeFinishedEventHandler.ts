@@ -5,7 +5,7 @@
  */
 
 import type { StreamingEventData, NodeFinishedEvent } from '@/types';
-import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult } from './baseEventHandler';
+import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type EventHandlerState } from './baseEventHandler';
 
 /**
  * ノード完了イベントハンドラー
@@ -17,10 +17,6 @@ export class NodeFinishedEventHandler extends BaseEventHandler {
    */
   constructor(options: EventHandlerOptions = {}) {
     super(options);
-    
-    if (this.debug) {
-      console.log('🔧 [NodeFinishedEventHandler] ハンドラー初期化完了');
-    }
   }
   
   /**
@@ -37,21 +33,18 @@ export class NodeFinishedEventHandler extends BaseEventHandler {
    * イベントを処理する
    * @param eventData - イベントデータ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   handle(
     eventData: StreamingEventData,
     onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    state: EventHandlerState
   ): EventHandlerResult {
     const nodeData = (eventData as NodeFinishedEvent).data;
     const text = nodeData.outputs.text;
     
     // ノード完了イベントはノード出力として扱う（ワークフロー完了ではない）
-    const isNodeOutput = true;
     const isWorkflowCompletion = false;
     
     // 改行のみのテキストも処理するように条件を変更
@@ -65,19 +58,22 @@ export class NodeFinishedEventHandler extends BaseEventHandler {
         content: text
       });
       
-      const sent = this.sendChunk(chunk, isWorkflowCompletion, onChunk, lastContent);
+      const sent = this.sendChunk(chunk, isWorkflowCompletion, onChunk, state.lastContent);
       
-      return {
-        // ノード出力なので累積テキストは維持
-        accumulatedText: accumulatedText,
-        lastContent: sent ? chunk : lastContent,
-        handled: true
-      };
+      if (sent) {
+        return {
+          state: {
+            // ノード出力なので累積テキストは維持
+            accumulatedText: state.accumulatedText,
+            lastContent: chunk
+          },
+          handled: true
+        };
+      }
     }
     
     return {
-      accumulatedText,
-      lastContent,
+      state,
       handled: true
     };
   }

@@ -5,7 +5,7 @@
  */
 
 import type { StreamingEventData, NodeStartedEvent } from '@/types';
-import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult } from './baseEventHandler';
+import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type EventHandlerState } from './baseEventHandler';
 
 /**
  * ノードタイトルとセッション変数のマッピング
@@ -34,10 +34,6 @@ export class NodeStartedEventHandler extends BaseEventHandler {
    */
   constructor(options: EventHandlerOptions = {}) {
     super(options);
-    
-    if (this.debug) {
-      console.log('🔧 [NodeStartedEventHandler] ハンドラー初期化完了');
-    }
   }
   
   /**
@@ -53,15 +49,13 @@ export class NodeStartedEventHandler extends BaseEventHandler {
    * イベントを処理する
    * @param eventData - イベントデータ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   handle(
     eventData: StreamingEventData,
     onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    state: EventHandlerState
   ): EventHandlerResult {
     const nodeData = (eventData as NodeStartedEvent).data;
     const nodeId = nodeData.node_id;
@@ -79,13 +73,8 @@ export class NodeStartedEventHandler extends BaseEventHandler {
     // ノードIDと変数名のマッピングを保存
     this.nodeIdToVariable.set(nodeId, variableName);
     
-    if (this.debug) {
-      console.log(`🔄 [NodeStartedEventHandler] ノードIDと変数名のマッピングを保存: ${nodeId} -> ${variableName}`);
-    }
-    
     return {
-      accumulatedText,
-      lastContent,
+      state,
       handled: true
     };
   }

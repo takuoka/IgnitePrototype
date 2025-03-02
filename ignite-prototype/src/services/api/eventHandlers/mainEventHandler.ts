@@ -5,7 +5,7 @@
  */
 
 import type { StreamingEventData } from '@/types';
-import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type IEventHandler } from './baseEventHandler';
+import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type EventHandlerState, type IEventHandler } from './baseEventHandler';
 import { TextChunkEventHandler } from './textChunkEventHandler';
 import { NodeStartedEventHandler } from './nodeStartedEventHandler';
 import { NodeFinishedEventHandler } from './nodeFinishedEventHandler';
@@ -18,6 +18,7 @@ export class MainEventHandler extends BaseEventHandler {
   private readonly handlers: IEventHandler[];
   private readonly nodeStartedHandler: NodeStartedEventHandler;
   private readonly workflowFinishedHandler: WorkflowFinishedEventHandler;
+  private state: EventHandlerState = { accumulatedText: '', lastContent: '' };
   
   /**
    * コンストラクタ
@@ -37,10 +38,6 @@ export class MainEventHandler extends BaseEventHandler {
       new NodeFinishedEventHandler(options),
       this.workflowFinishedHandler
     ];
-    
-    if (this.debug) {
-      console.log('🔧 [MainEventHandler] ハンドラー初期化完了');
-    }
   }
   
   /**
@@ -48,12 +45,11 @@ export class MainEventHandler extends BaseEventHandler {
    * 新しいセッションが開始されたときに呼び出す
    */
   public resetSession(): void {
+    // 状態をリセット
+    this.state = { accumulatedText: '', lastContent: '' };
+    
     // WorkflowFinishedEventHandlerのセッションをリセット
     this.workflowFinishedHandler.resetSession();
-    
-    if (this.debug) {
-      console.log('🔄 [MainEventHandler] セッションをリセット');
-    }
   }
   
   /**
@@ -70,36 +66,28 @@ export class MainEventHandler extends BaseEventHandler {
    * イベントを処理する
    * @param eventData - イベントデータ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   handle(
     eventData: StreamingEventData,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
+    state: EventHandlerState
   ): EventHandlerResult {
     // 処理可能なハンドラーを探す
     for (const handler of this.handlers) {
       if (handler.canHandle(eventData)) {
-        if (this.debug) {
-          console.log(`🔄 [MainEventHandler] イベント "${eventData.event}" を ${handler.constructor.name} で処理`);
-        }
-        
         // ハンドラーに処理を委譲
-        return handler.handle(eventData, onChunk, accumulatedText, lastContent);
+        const result = handler.handle(eventData, onChunk, state);
+        if (result.handled) {
+          return result;
+        }
       }
     }
     
     // 処理できるハンドラーがない場合
-    if (this.debug) {
-      console.log(`⚠️ [MainEventHandler] イベント "${eventData.event}" を処理できるハンドラーがありません`);
-    }
-    
     return {
-      accumulatedText,
-      lastContent,
+      state,
       handled: false
     };
   }
@@ -114,14 +102,26 @@ export class MainEventHandler extends BaseEventHandler {
    */
   handleEvent(
     eventData: StreamingEventData,
-    onChunk: (chunk: string, isFinal?: boolean) => void,
+    onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
     accumulatedText: string,
     lastContent: string
   ): { accumulatedText: string; lastContent: string } {
-    const result = this.handle(eventData, onChunk, accumulatedText, lastContent);
+    // 状態を更新
+    this.state = { 
+      accumulatedText: accumulatedText || this.state.accumulatedText,
+      lastContent: lastContent || this.state.lastContent
+    };
+    
+    // イベントを処理
+    const result = this.handle(eventData, onChunk, this.state);
+    
+    // 状態を更新
+    this.state = result.state;
+    
+    // 旧インターフェース互換の結果を返す
     return {
-      accumulatedText: result.accumulatedText,
-      lastContent: result.lastContent
+      accumulatedText: this.state.accumulatedText,
+      lastContent: this.state.lastContent
     };
   }
 }

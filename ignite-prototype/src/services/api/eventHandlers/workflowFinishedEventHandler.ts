@@ -5,7 +5,7 @@
  */
 
 import type { StreamingEventData, WorkflowFinishedEvent } from '@/types';
-import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult } from './baseEventHandler';
+import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type EventHandlerState } from './baseEventHandler';
 import type { ContentFilter } from './contentFilter';
 import { createContentFilter } from './contentFilter';
 
@@ -30,10 +30,6 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
   ) {
     super(options);
     this.contentFilter = contentFilter;
-    
-    if (this.debug) {
-      console.log('🔧 [WorkflowFinishedEventHandler] ハンドラー初期化完了');
-    }
   }
   
   /**
@@ -52,49 +48,35 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
    */
   public resetSession(): void {
     this.hasProcessedWorkflowFinishedInCurrentSession = false;
-    
-    if (this.debug) {
-      console.log('🔄 [WorkflowFinishedEventHandler] セッションをリセット');
-    }
   }
   
   /**
    * イベントを処理する
    * @param eventData - イベントデータ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   handle(
     eventData: StreamingEventData,
     onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    state: EventHandlerState
   ): EventHandlerResult {
     const workflowEvent = eventData as WorkflowFinishedEvent;
     const workflowId = workflowEvent.data.id;
     
     // 既に処理済みのワークフローIDの場合はスキップ
     if (workflowId && this.processedWorkflowIds.has(workflowId)) {
-      if (this.debug) {
-        console.log(`⏭️ [WorkflowFinishedEventHandler] 既に処理済みのワークフローをスキップ: ${workflowId}`);
-      }
       return {
-        accumulatedText,
-        lastContent,
+        state,
         handled: true
       };
     }
     
     // 同一セッション内で既にworkflow_finishedイベントを処理済みの場合はスキップ
     if (this.hasProcessedWorkflowFinishedInCurrentSession) {
-      if (this.debug) {
-        console.log(`⏭️ [WorkflowFinishedEventHandler] 同一セッション内で既にworkflow_finishedイベントを処理済み`);
-      }
       return {
-        accumulatedText,
-        lastContent,
+        state,
         handled: true
       };
     }
@@ -104,24 +86,16 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
     // ワークフローIDを処理済みとしてマーク
     if (workflowId) {
       this.processedWorkflowIds.add(workflowId);
-      
-      if (this.debug) {
-        console.log(`✅ [WorkflowFinishedEventHandler] ワークフローを処理済みとしてマーク: ${workflowId}`);
-      }
     }
     
     // 同一セッション内でworkflow_finishedイベントを処理済みとしてマーク
     this.hasProcessedWorkflowFinishedInCurrentSession = true;
     
-    if (this.debug) {
-      console.log(`✅ [WorkflowFinishedEventHandler] 同一セッション内でworkflow_finishedイベントを処理済みとしてマーク`);
-    }
-    
     // 新しいフィールド（advice, phrases, words）が存在するか確認
     if (this.hasMultiSectionOutputs(outputs)) {
-      return this.handleMultiSectionOutputs(outputs, onChunk, accumulatedText, lastContent);
+      return this.handleMultiSectionOutputs(outputs, onChunk, state);
     } else {
-      return this.handleLegacyOutputs(outputs, onChunk, accumulatedText, lastContent);
+      return this.handleLegacyOutputs(outputs, onChunk, state);
     }
   }
   
@@ -138,19 +112,14 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
    * 複数セクションの出力を処理
    * @param outputs - 出力データ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   private handleMultiSectionOutputs(
     outputs: Record<string, any>,
     onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    state: EventHandlerState
   ): EventHandlerResult {
-    let handled = false;
-    let newLastContent = lastContent;
-    
     // ワークフロー完了イベントはワークフロー完了として扱う
     const isWorkflowCompletion = true;
     
@@ -168,24 +137,20 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
     const finalChunk = JSON.stringify(finalOutputs);
     
     // 前回と同じ内容でなければ送信
-    if (finalChunk !== lastContent) {
-      const sent = this.sendChunk(finalChunk, isWorkflowCompletion, onChunk, newLastContent);
-      
-      if (sent) {
-        newLastContent = finalChunk;
-        handled = true;
-        
-        if (this.debug) {
-          console.log(`📤 [WorkflowFinishedEventHandler] マルチセクション出力を送信`);
-        }
-      }
-    } else if (this.debug) {
-      console.log(`⏭️ [WorkflowFinishedEventHandler] 重複するマルチセクション出力をスキップ`);
+    const sent = this.sendChunk(finalChunk, isWorkflowCompletion, onChunk, state.lastContent);
+    
+    if (sent) {
+      return {
+        state: {
+          accumulatedText: '',
+          lastContent: finalChunk
+        },
+        handled: true
+      };
     }
     
     return {
-      accumulatedText: '',
-      lastContent: newLastContent,
+      state,
       handled: true
     };
   }
@@ -194,15 +159,13 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
    * 従来の出力を処理（後方互換性のため）
    * @param outputs - 出力データ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   private handleLegacyOutputs(
     outputs: Record<string, any>,
     onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    state: EventHandlerState
   ): EventHandlerResult {
     // ワークフロー完了イベントはワークフロー完了として扱う
     const isWorkflowCompletion = true;
@@ -216,27 +179,22 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
         });
         
         // 前回と同じ内容でなければ送信
-        if (legacyChunk !== lastContent) {
-          const sent = this.sendChunk(legacyChunk, isWorkflowCompletion, onChunk, lastContent);
-          
-          if (this.debug) {
-            console.log(`📤 [WorkflowFinishedEventHandler] レガシー出力を送信: ${key}`);
-          }
-          
+        const sent = this.sendChunk(legacyChunk, isWorkflowCompletion, onChunk, state.lastContent);
+        
+        if (sent) {
           return {
-            accumulatedText: '',
-            lastContent: sent ? legacyChunk : lastContent,
+            state: {
+              accumulatedText: '',
+              lastContent: legacyChunk
+            },
             handled: true
           };
-        } else if (this.debug) {
-          console.log(`⏭️ [WorkflowFinishedEventHandler] 重複するレガシー出力をスキップ: ${key}`);
         }
       }
     }
     
     return {
-      accumulatedText,
-      lastContent,
+      state,
       handled: true
     };
   }

@@ -5,7 +5,7 @@
  */
 
 import type { StreamingEventData, TextChunkEvent } from '@/types';
-import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult } from './baseEventHandler';
+import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type EventHandlerState } from './baseEventHandler';
 import { NodeStartedEventHandler } from './nodeStartedEventHandler';
 
 /**
@@ -28,10 +28,6 @@ export class TextChunkEventHandler extends BaseEventHandler {
   ) {
     super(options);
     this.nodeStartedHandler = nodeStartedHandler || new NodeStartedEventHandler(options);
-    
-    if (this.debug) {
-      console.log('🔧 [TextChunkEventHandler] ハンドラー初期化完了');
-    }
   }
   
   /**
@@ -57,24 +53,19 @@ export class TextChunkEventHandler extends BaseEventHandler {
    * イベントを処理する
    * @param eventData - イベントデータ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   handle(
     eventData: StreamingEventData,
     onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    state: EventHandlerState
   ): EventHandlerResult {
     const textChunkEvent = eventData as TextChunkEvent;
     let text = textChunkEvent.data.text;
     
     // 前回のチャンクが見出し記号で終わっていた場合、現在のチャンクの先頭にスペースを挿入
     if (this.previousChunk && this.endsWithHeadingMarker(this.previousChunk) && text.trim() && !text.startsWith(' ')) {
-      if (this.debug) {
-        console.log(`🔍 [TextChunkEventHandler] 見出し記号の後にスペースを挿入: "${this.previousChunk}" + " " + "${text}"`);
-      }
       text = ' ' + text;
     }
     
@@ -94,10 +85,6 @@ export class TextChunkEventHandler extends BaseEventHandler {
       let chunkType = 'legacy';
       if (nodeId) {
         chunkType = this.nodeStartedHandler.getVariableNameForNodeId(nodeId);
-        
-        if (this.debug) {
-          console.log(`🔍 [TextChunkEventHandler] ノードID ${nodeId} の変数名: ${chunkType}`);
-        }
       }
       
       // JSONとして送信
@@ -106,19 +93,21 @@ export class TextChunkEventHandler extends BaseEventHandler {
         content: text
       });
       
-      const sent = this.sendChunk(chunk, isWorkflowCompletion, onChunk, lastContent);
+      const sent = this.sendChunk(chunk, isWorkflowCompletion, onChunk, state.lastContent);
       
-      return {
-        // 中間結果なので累積テキストは維持
-        accumulatedText: sent ? accumulatedText + text : accumulatedText,
-        lastContent: sent ? chunk : lastContent,
-        handled: true
-      };
+      if (sent) {
+        return {
+          state: {
+            accumulatedText: state.accumulatedText + text,
+            lastContent: chunk
+          },
+          handled: true
+        };
+      }
     }
     
     return {
-      accumulatedText,
-      lastContent,
+      state,
       handled: true
     };
   }

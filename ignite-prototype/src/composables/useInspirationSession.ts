@@ -36,7 +36,7 @@ export function useInspirationSession() {
   const lastProcessedChunk = ref<string>('')
   
   // イベントハンドラーを作成
-  const eventHandler = createEventHandler({ debug: true })
+  const eventHandler = createEventHandler()
   
   /**
    * 表示用のテキストを生成
@@ -91,7 +91,6 @@ export function useInspirationSession() {
   const processChunk = (chunk: string, isWorkflowCompletion: boolean, processedTypes: Set<string>) => {
     // 重複チェック - 前回と同じチャンクは処理しない
     if (chunk === lastProcessedChunk.value) {
-      console.log('⏭️ [InspirationSession] 重複チャンクをスキップ');
       return;
     }
     
@@ -99,7 +98,6 @@ export function useInspirationSession() {
     
     // 既に処理済みのタイプは無視（重複防止）
     if (isWorkflowCompletion && processedTypes.has(parsedChunk.type)) {
-      console.log(`⏭️ [InspirationSession] 処理済みタイプをスキップ: ${parsedChunk.type}`);
       return;
     }
     
@@ -124,12 +122,10 @@ export function useInspirationSession() {
       case 'node_llm':
       case 'node_other':
         // ノード完了イベントは中間結果として扱う（無視）
-        console.log(`ℹ️ [InspirationSession] ノード出力をスキップ: ${parsedChunk.type}`);
         break
       case 'workflow_outputs':
         // ワークフロー完了イベントは最終結果として扱う
         if (isWorkflowCompletion) {
-          console.log(`✅ [InspirationSession] ワークフロー出力を処理: ${parsedChunk.type}`);
           const outputs = parsedChunk.content as WorkflowOutputs
           if (outputs.advice) currentSession.value.advice = outputs.advice
           if (outputs.phrases) currentSession.value.phrases = outputs.phrases
@@ -147,8 +143,6 @@ export function useInspirationSession() {
       case 'completion':
         // 完了通知の場合
         if (isWorkflowCompletion) {
-          console.log(`✅ [InspirationSession] 完了通知を処理`);
-          
           // 完了通知の内容がある場合は処理
           if (typeof parsedChunk.content === 'string' && parsedChunk.content.trim()) {
             currentSession.value.legacy += parsedChunk.content as string
@@ -156,9 +150,6 @@ export function useInspirationSession() {
           
           processedTypes.add('completion')
         }
-        break
-      default:
-        console.log(`⚠️ [InspirationSession] 未知のチャンクタイプ: ${parsedChunk.type}`);
         break
     }
     
@@ -202,7 +193,6 @@ export function useInspirationSession() {
       // イベントハンドラーのセッションをリセット
       if (eventHandler.resetSession) {
         eventHandler.resetSession()
-        console.log('🔄 [InspirationSession] イベントハンドラーのセッションをリセット');
       }
       
       // HTMLを更新
@@ -212,32 +202,23 @@ export function useInspirationSession() {
       // 処理済みタイプを追跡（重複防止）
       const processedTypes = new Set<string>()
       
-      console.log('🚀 [InspirationSession] ストリーミング開始');
-      
       // ストリーミングモードでAPI呼び出し
       await fetchDifyInspirationStream(lyrics, (chunk: string, isWorkflowCompletion?: boolean) => {
-        console.log(`📦 [InspirationSession] チャンク受信: ${isWorkflowCompletion ? '(完了)' : ''}`);
-        
         processChunk(chunk, !!isWorkflowCompletion, processedTypes)
         if (onUpdate) onUpdate()
         
         // ワークフロー完了が届いたら生成終了
         if (isWorkflowCompletion && processedTypes.size > 0) {
-          console.log('✅ [InspirationSession] ワークフロー完了を検出');
           isGenerating.value = false
         }
       })
       
-      console.log('🏁 [InspirationSession] ストリーミング終了');
-      
       // ストリーミングが終了しても最終結果が届いていない場合
       if (isGenerating.value) {
-        console.log('⚠️ [InspirationSession] 明示的な完了通知なしでストリーミング終了');
         isGenerating.value = false
       }
       
     } catch (error: any) {
-      console.error('❌ エラー発生:', error?.message || error)
       logError('InspirationSession', error)
       hasError.value = true
       isGenerating.value = false

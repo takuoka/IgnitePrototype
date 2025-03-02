@@ -17,9 +17,9 @@ export interface EventHandlerOptions {
 }
 
 /**
- * イベントハンドラーの結果
+ * イベントハンドラーの状態
  */
-export interface EventHandlerResult {
+export interface EventHandlerState {
   /**
    * 累積テキスト
    */
@@ -29,6 +29,16 @@ export interface EventHandlerResult {
    * 最後に送信したコンテンツ
    */
   lastContent: string;
+}
+
+/**
+ * イベントハンドラーの結果
+ */
+export interface EventHandlerResult {
+  /**
+   * 更新された状態
+   */
+  state: EventHandlerState;
   
   /**
    * イベントが処理されたかどうか
@@ -51,15 +61,13 @@ export interface IEventHandler {
    * イベントを処理する
    * @param eventData - イベントデータ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   handle(
     eventData: StreamingEventData,
     onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    state: EventHandlerState
   ): EventHandlerResult;
 }
 
@@ -88,15 +96,13 @@ export abstract class BaseEventHandler implements IEventHandler {
    * イベントを処理する
    * @param eventData - イベントデータ
    * @param onChunk - コールバック関数
-   * @param accumulatedText - 累積テキスト
-   * @param lastContent - 前回送信したコンテンツ
+   * @param state - 現在の状態
    * @returns 処理結果
    */
   abstract handle(
     eventData: StreamingEventData,
     onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void,
-    accumulatedText: string,
-    lastContent: string
+    state: EventHandlerState
   ): EventHandlerResult;
   
   /**
@@ -116,25 +122,7 @@ export abstract class BaseEventHandler implements IEventHandler {
     // 重複チェック - 前回と同じ内容なら送信しない
     // 改行のみのチャンクも処理するように条件を変更
     if (content === lastContent || (!content.trim() && !content.includes('\n'))) {
-      if (this.debug) {
-        console.log(`⏭️ [EventHandler] 重複または空のチャンクをスキップ`);
-      }
       return false;
-    }
-    
-    if (this.debug) {
-      console.log(`📤 [EventHandler] チャンク送信: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''} ${isWorkflowCompletion ? '(ワークフロー完了)' : ''}`);
-      
-      // チャンクの詳細ログ（改行を可視化）
-      const contentWithVisibleNewlines = content.replace(/\n/g, '\\n');
-      console.log(`🔍 [EventHandler] チャンク詳細: "${contentWithVisibleNewlines}"`);
-      
-      // チャンクの文字コード表示
-      const charCodes = Array.from(content).map(char => {
-        const code = char.charCodeAt(0);
-        return `${char}(${code})`;
-      }).join(' ');
-      console.log(`🔢 [EventHandler] チャンク文字コード: ${charCodes}`);
     }
     
     onChunk(content, isWorkflowCompletion);
