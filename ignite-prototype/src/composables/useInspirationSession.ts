@@ -2,8 +2,8 @@
  * インスピレーションセッション管理のコンポーザブル
  */
 import { ref, computed } from 'vue'
-import { fetchDifyInspirationStream } from '@/services/api/difyService'
-import { createEventHandler } from '@/services/api/difyEventHandler'
+import { fetchDifyInspirationStream } from '@/services/api/dify/difyService'
+import { createEventHandlerRegistry } from '@/services/api/stream/eventHandlerRegistry'
 import { createApiErrorMessage, logError } from '@/utils/errorHandler'
 import { sessionsToMarkdown, markdownToHtml } from '@/utils/markdownConverter'
 import { VARIABLE_NAMES, EVENT_TYPES, UI_TEXTS } from '@/services/api/constants'
@@ -38,7 +38,7 @@ export function useInspirationSession() {
   const lastProcessedChunk = ref<string>('')
   
   // イベントハンドラーを作成
-  const eventHandler = createEventHandler()
+  const eventHandler = createEventHandlerRegistry()
   
   /**
    * 表示用のテキストを生成
