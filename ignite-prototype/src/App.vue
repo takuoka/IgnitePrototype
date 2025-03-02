@@ -7,6 +7,7 @@ import type { LyricsEditorInterface } from './types'
 const lyricsEditorRef = ref<LyricsEditorInterface | null>(null)
 
 const currentLyrics = computed(() => lyricsEditorRef.value?.lyrics.get() || '')
+const favoriteLyrics = computed(() => lyricsEditorRef.value?.favoriteLyrics.get() || '')
 
 const handleUpdateInspiration = () => {
   // イベントを受け取るだけ
@@ -21,6 +22,7 @@ const handleUpdateInspiration = () => {
     <div class="inspiration-container">
       <InspirationPanel 
         :lyrics="currentLyrics"
+        :favorite-lyrics="favoriteLyrics"
         @update="handleUpdateInspiration"
       />
     </div>

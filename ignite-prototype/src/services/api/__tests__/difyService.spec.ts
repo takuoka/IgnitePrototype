@@ -51,14 +51,15 @@ describe('difyService', () => {
   describe('fetchDifyInspirationStream - 正常系', () => {
     it('クライアントとストリームプロセッサを作成し、ストリームを処理すること', async () => {
       // テスト実行
-      await fetchDifyInspirationStream('テスト歌詞', mockOnChunk)
+      await fetchDifyInspirationStream('テスト歌詞', '', mockOnChunk)
       
       // 検証
       expect(difyClient.createDifyClient).toHaveBeenCalledTimes(1)
       expect(difyStreamProcessor.createStreamProcessor).toHaveBeenCalledWith({ debug: true })
       
       expect(mockClient.sendStreamingRequest).toHaveBeenCalledWith({
-        currentLyric: 'テスト歌詞'
+        currentLyric: 'テスト歌詞',
+        favorite_lyrics: ''
       })
       
       expect(mockStreamProcessor.processStream).toHaveBeenCalledWith(mockReader, mockOnChunk)
@@ -66,11 +67,12 @@ describe('difyService', () => {
 
     it('空の歌詞が渡された場合、デフォルトメッセージを使用すること', async () => {
       // テスト実行
-      await fetchDifyInspirationStream('', mockOnChunk)
+      await fetchDifyInspirationStream('', '', mockOnChunk)
       
       // 検証
       expect(mockClient.sendStreamingRequest).toHaveBeenCalledWith({
-        currentLyric: '歌詞を入力してください'
+        currentLyric: '歌詞を入力してください',
+        favorite_lyrics: ''
       })
     })
   })
@@ -83,7 +85,7 @@ describe('difyService', () => {
       mockClient.sendStreamingRequest.mockRejectedValueOnce(testError)
       
       // テスト実行とエラー検証
-      await expect(fetchDifyInspirationStream('テスト歌詞', mockOnChunk)).rejects.toThrow('テストエラー')
+      await expect(fetchDifyInspirationStream('テスト歌詞', '', mockOnChunk)).rejects.toThrow('テストエラー')
       
       // エラーログの検証
       expect(logError).toHaveBeenCalledWith('DifyService', testError)
@@ -95,7 +97,7 @@ describe('difyService', () => {
       mockStreamProcessor.processStream.mockRejectedValueOnce(testError)
       
       // テスト実行とエラー検証
-      await expect(fetchDifyInspirationStream('テスト歌詞', mockOnChunk)).rejects.toThrow('ストリーム処理エラー')
+      await expect(fetchDifyInspirationStream('テスト歌詞', '', mockOnChunk)).rejects.toThrow('ストリーム処理エラー')
       
       // エラーログの検証
       expect(logError).toHaveBeenCalledWith('DifyService', testError)

@@ -5,7 +5,7 @@
  */
 
 import type { EventHandlerOptions } from './baseEventHandler';
-import { RESULT_KEYS } from '../constants';
+import { RESULT_KEYS, INPUT_VARIABLE_NAMES } from '../constants';
 
 /**
  * コンテンツフィルターインターフェース
@@ -47,7 +47,7 @@ export class DifyContentFilter implements ContentFilter {
     }
     
     // 入力データを示す可能性のあるキー
-    const inputKeys = ['currentLyric', 'sys.'];
+    const inputKeys = [...INPUT_VARIABLE_NAMES, 'sys.'];
     
     // キーが入力データを示す場合
     if (inputKeys.some(inputKey => key.includes(inputKey))) {

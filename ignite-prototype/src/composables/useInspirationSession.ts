@@ -163,9 +163,10 @@ export function useInspirationSession() {
   /**
    * インスピレーションを更新
    * @param lyrics 歌詞
+   * @param favoriteLyrics 好きな歌詞
    * @param onUpdate 更新時のコールバック
    */
-  const updateInspiration = async (lyrics: string = '', onUpdate?: () => void) => {
+  const updateInspiration = async (lyrics: string = '', favoriteLyrics: string = '', onUpdate?: () => void) => {
     try {
       isLoading.value = true
       hasError.value = false
@@ -198,7 +199,7 @@ export function useInspirationSession() {
       const processedTypes = new Set<string>()
       
       // ストリーミングモードでAPI呼び出し
-      await fetchDifyInspirationStream(lyrics, (chunk: string, isWorkflowCompletion?: boolean) => {
+      await fetchDifyInspirationStream(lyrics, favoriteLyrics, (chunk: string, isWorkflowCompletion?: boolean) => {
         processChunk(chunk, !!isWorkflowCompletion, processedTypes)
         if (onUpdate) onUpdate()
         

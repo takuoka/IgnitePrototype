@@ -82,8 +82,34 @@ describe('DifyClient', () => {
       client = new DifyApiClient()
     })
 
-    it('正しいパラメータでAPIを呼び出すこと', async () => {
+    it('currentLyricのみでAPIを呼び出すこと', async () => {
       const inputs = { currentLyric: 'テスト歌詞' }
+      
+      await client.sendStreamingRequest(inputs)
+      
+      // fetchの呼び出しを検証
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.example.com/workflows/run',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer test-api-key',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            inputs: inputs,
+            user: mockUserId,
+            response_mode: 'streaming'
+          })
+        }
+      )
+    })
+
+    it('currentLyricとfavorite_lyricsでAPIを呼び出すこと', async () => {
+      const inputs = { 
+        currentLyric: 'テスト歌詞',
+        favorite_lyrics: '好きな歌詞テスト'
+      }
       
       await client.sendStreamingRequest(inputs)
       

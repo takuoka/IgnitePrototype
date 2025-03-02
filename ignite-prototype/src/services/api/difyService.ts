@@ -12,14 +12,17 @@ import { createStreamProcessor } from './difyStreamProcessor';
 /**
  * ストリーミングでDify APIを呼び出し、逐次データをコールバックで返す
  * @param lyrics - モチベーション生成の元となる歌詞
+ * @param favoriteLyrics - 好きな歌詞
  * @param onChunk - 各チャンク受信時に呼ばれるコールバック関数
  */
 export const fetchDifyInspirationStream = async (
   lyrics: string,
+  favoriteLyrics: string = '',
   onChunk: (chunk: string, isWorkflowCompletion?: boolean) => void
 ): Promise<void> => {
   console.log('🚀 [DifyService] ストリーミングAPI呼び出し開始');
   console.log('📝 [DifyService] 入力歌詞:', lyrics.substring(0, 100) + (lyrics.length > 100 ? '...' : ''));
+  console.log('📝 [DifyService] 好きな歌詞:', favoriteLyrics.substring(0, 100) + (favoriteLyrics.length > 100 ? '...' : ''));
   
   try {
     // クライアントとストリームプロセッサを作成
@@ -28,7 +31,8 @@ export const fetchDifyInspirationStream = async (
     
     // リクエストデータの準備
     const inputs = {
-      currentLyric: lyrics || '歌詞を入力してください'
+      currentLyric: lyrics || '歌詞を入力してください',
+      favorite_lyrics: favoriteLyrics
     };
     
     // ストリーミングリクエストを送信

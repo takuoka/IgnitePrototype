@@ -149,6 +149,11 @@ describe('DifyEventHandler', () => {
       expect(result).toBe(true)
     })
 
+    it('favorite_lyricsを含むキーのデータは無視すること', () => {
+      const result = filter.shouldIgnoreData('favorite_lyrics', 'テストデータ')
+      expect(result).toBe(true)
+    })
+
     it('sys.を含むキーのデータは無視すること', () => {
       const result = filter.shouldIgnoreData('sys.test', 'テストデータ')
       expect(result).toBe(true)

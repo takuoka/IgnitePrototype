@@ -5,7 +5,12 @@
  */
 
 /**
- * 変数名の配列
+ * 入力変数名の配列
+ */
+export const INPUT_VARIABLE_NAMES = ['currentLyric', 'favorite_lyrics'];
+
+/**
+ * 出力変数名の配列
  */
 export const VARIABLE_NAMES = ['advice', 'phrases', 'words'];
 

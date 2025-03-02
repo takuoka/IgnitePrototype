@@ -5,6 +5,7 @@ import { useInspirationSession } from '@/composables/useInspirationSession'
 // Props and emits
 const props = defineProps<{
   lyrics?: string
+  favoriteLyrics?: string
 }>()
 
 const emit = defineEmits(['update'])
@@ -31,7 +32,7 @@ onMounted(() => {
  * インスピレーションを更新
  */
 const handleUpdateInspiration = async () => {
-  await updateInspiration(props.lyrics || '', handleUpdate)
+  await updateInspiration(props.lyrics || '', props.favoriteLyrics || '', handleUpdate)
 }
 
 </script>

@@ -4,6 +4,30 @@ export * from './inspiration'
 // その他の型定義
 
 /**
+ * 歌詞エディタインターフェース
+ */
+export interface LyricsEditorInterface {
+  lyrics: {
+    get: () => string;
+  };
+  favoriteLyrics: {
+    get: () => string;
+  };
+}
+
+/**
+ * Dify APIリクエスト
+ */
+export interface DifyAPIRequest {
+  inputs: {
+    currentLyric: string;
+    favorite_lyrics?: string;
+  };
+  user: string;
+  response_mode: string;
+}
+
+/**
  * Dify APIのストリーミングイベントデータ
  */
 export interface StreamingEventData {
