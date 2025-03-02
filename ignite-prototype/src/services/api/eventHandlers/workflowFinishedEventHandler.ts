@@ -8,6 +8,7 @@ import type { StreamingEventData, WorkflowFinishedEvent } from '@/types';
 import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type EventHandlerState } from './baseEventHandler';
 import type { ContentFilter } from './contentFilter';
 import { createContentFilter } from './contentFilter';
+import { VARIABLE_NAMES } from '../constants';
 
 /**
  * ワークフロー完了イベントハンドラー
@@ -105,7 +106,7 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
    * @returns 複数セクションの出力があるかどうか
    */
   private hasMultiSectionOutputs(outputs: Record<string, any>): boolean {
-    return !!(outputs.advice || outputs.phrases || outputs.words);
+    return VARIABLE_NAMES.some(name => !!outputs[name]);
   }
   
   /**
@@ -124,13 +125,16 @@ export class WorkflowFinishedEventHandler extends BaseEventHandler {
     const isWorkflowCompletion = true;
     
     // 各セクションを一度に送信（ワークフロー完了として）
+    const content: Record<string, string> = {};
+    
+    // 各変数名に対応する出力を設定
+    VARIABLE_NAMES.forEach(name => {
+      content[name] = outputs[name] || '';
+    });
+    
     const finalOutputs = {
       type: 'workflow_outputs',
-      content: {
-        advice: outputs.advice || '',
-        phrases: outputs.phrases || '',
-        words: outputs.words || ''
-      }
+      content
     };
     
     // ワークフロー完了として送信

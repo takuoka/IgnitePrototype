@@ -6,20 +6,7 @@
 
 import type { StreamingEventData, NodeStartedEvent } from '@/types';
 import { BaseEventHandler, type EventHandlerOptions, type EventHandlerResult, type EventHandlerState } from './baseEventHandler';
-
-/**
- * ノードタイトルとセッション変数のマッピング
- */
-const TITLE_TO_VARIABLE_MAP: Record<string, string> = {
-  // 日本語タイトル
-  'アドバイス': 'advice',
-  'フレーズ': 'phrases',
-  'ワード': 'words',
-  // 英語タイトル
-  'advice': 'advice',
-  'phrases': 'phrases',
-  'words': 'words'
-};
+import { TITLE_TO_VARIABLE_MAP } from '../constants';
 
 /**
  * ノード開始イベントハンドラー

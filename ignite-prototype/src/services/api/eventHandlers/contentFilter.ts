@@ -5,6 +5,7 @@
  */
 
 import type { EventHandlerOptions } from './baseEventHandler';
+import { RESULT_KEYS } from '../constants';
 
 /**
  * コンテンツフィルターインターフェース
@@ -40,11 +41,8 @@ export class DifyContentFilter implements ContentFilter {
    * @returns 無視すべきデータかどうか
    */
   shouldIgnoreData(key: string, value: any): boolean {
-    // 最終結果を示す可能性のあるキー
-    const resultKeys = ['result', 'text', 'answer', 'content', 'advice', 'phrases', 'words'];
-    
     // 最終結果を示すキーの場合はスキップしない
-    if (resultKeys.some(resultKey => key === resultKey || key.endsWith(`.${resultKey}`))) {
+    if (RESULT_KEYS.some(resultKey => key === resultKey || key.endsWith(`.${resultKey}`))) {
       return false;
     }
     
