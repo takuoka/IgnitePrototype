@@ -15,6 +15,7 @@ const emit = defineEmits(['update'])
 const {
   renderedHtml,
   isLoading,
+  isGenerating,
   updateInspiration,
   updateHtml
 } = useInspirationSession()
@@ -40,7 +41,6 @@ const handleUpdateInspiration = async () => {
     props.globalInstruction || ''
   )
 }
-
 </script>
 
 <template>
@@ -49,6 +49,12 @@ const handleUpdateInspiration = async () => {
       class="markdown-content card custom-scrollbar"
       v-html="renderedHtml"
     ></div>
+    
+    <!-- 生成中インジケーター（テキストの下に表示） -->
+    <div v-if="isLoading || isGenerating" class="inline-indicator">
+      <div class="spinner-inline"></div>
+    </div>
+    
     <div class="button-container">
       <button 
         class="primary-button"
@@ -68,6 +74,7 @@ const handleUpdateInspiration = async () => {
   display: flex;
   flex-direction: column;
   background-color: transparent;
+  position: relative; /* ローディングインジケーターの配置のため */
 }
 
 .markdown-content {
@@ -91,5 +98,29 @@ const handleUpdateInspiration = async () => {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+/* インラインインジケーター（テキストの下に表示） */
+.inline-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 1rem 0;
+  pointer-events: none; /* ユーザーの操作を妨げない */
+}
+
+.spinner-inline {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: #3498db;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
