@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { DifyStreamParser, createStreamParser } from '../difyStreamParser'
+import { BaseStreamParser, createStreamParser } from '../stream/streamParser'
 import type { StreamingEventData, TextChunkEvent } from '../../../types'
 
-describe('DifyStreamParser', () => {
+describe('StreamParser', () => {
   // テスト用のモックデータ
   const mockTextChunkEvent: TextChunkEvent = {
     event: 'text_chunk',
@@ -15,25 +15,25 @@ describe('DifyStreamParser', () => {
   // テスト1: インスタンス化のテスト
   describe('インスタンス化', () => {
     it('デフォルトオプションでインスタンス化できること', () => {
-      const parser = new DifyStreamParser()
-      expect(parser).toBeInstanceOf(DifyStreamParser)
+      const parser = new BaseStreamParser()
+      expect(parser).toBeInstanceOf(BaseStreamParser)
     })
 
     it('デバッグオプションを有効にしてインスタンス化できること', () => {
-      const parser = new DifyStreamParser({ debug: true })
-      expect(parser).toBeInstanceOf(DifyStreamParser)
+      const parser = new BaseStreamParser({ debug: true })
+      expect(parser).toBeInstanceOf(BaseStreamParser)
     })
 
     it('createStreamParser関数でインスタンスを作成できること', () => {
       const parser = createStreamParser()
-      expect(parser).toBeInstanceOf(DifyStreamParser)
+      expect(parser).toBeInstanceOf(BaseStreamParser)
     })
   })
 
   // テスト2: parseChunkメソッドのテスト
   describe('parseChunk', () => {
     it('空のチャンクを解析できること', () => {
-      const parser = new DifyStreamParser()
+      const parser = new BaseStreamParser()
       const encoder = new TextEncoder()
       const chunk = encoder.encode('')
       
@@ -42,7 +42,7 @@ describe('DifyStreamParser', () => {
     })
 
     it('単一のイベントを含むチャンクを解析できること', () => {
-      const parser = new DifyStreamParser()
+      const parser = new BaseStreamParser()
       const encoder = new TextEncoder()
       const eventData = `data: ${JSON.stringify(mockTextChunkEvent)}\n\n`
       const chunk = encoder.encode(eventData)
@@ -53,7 +53,7 @@ describe('DifyStreamParser', () => {
     })
 
     it('複数のイベントを含むチャンクを解析できること', () => {
-      const parser = new DifyStreamParser()
+      const parser = new BaseStreamParser()
       const encoder = new TextEncoder()
       const eventData1 = `data: ${JSON.stringify(mockTextChunkEvent)}\n\n`
       const eventData2 = `data: ${JSON.stringify({ ...mockTextChunkEvent, data: { text: '別のテキスト', from_variable_selector: [] } })}\n\n`
@@ -66,7 +66,7 @@ describe('DifyStreamParser', () => {
     })
 
     it('不完全なイベントをバッファに保存すること', () => {
-      const parser = new DifyStreamParser()
+      const parser = new BaseStreamParser()
       const encoder = new TextEncoder()
       const partialEventData = `data: ${JSON.stringify(mockTextChunkEvent)}`  // 終端の \n\n がない
       const chunk = encoder.encode(partialEventData)
@@ -77,7 +77,7 @@ describe('DifyStreamParser', () => {
     })
 
     it('複数のチャンクにまたがるイベントを正しく解析できること', () => {
-      const parser = new DifyStreamParser()
+      const parser = new BaseStreamParser()
       const encoder = new TextEncoder()
       
       // 1つ目のチャンク（不完全なイベント）
@@ -99,7 +99,7 @@ describe('DifyStreamParser', () => {
     })
 
     it('無効なJSONを含むイベントをスキップすること', () => {
-      const parser = new DifyStreamParser()
+      const parser = new BaseStreamParser()
       const encoder = new TextEncoder()
       const invalidEventData = `data: {invalid json}\n\n`
       const validEventData = `data: ${JSON.stringify(mockTextChunkEvent)}\n\n`
@@ -126,7 +126,7 @@ describe('DifyStreamParser', () => {
   // テスト3: clearBufferメソッドのテスト
   describe('clearBuffer', () => {
     it('バッファをクリアすること', () => {
-      const parser = new DifyStreamParser()
+      const parser = new BaseStreamParser()
       const encoder = new TextEncoder()
       const partialEventData = `data: ${JSON.stringify(mockTextChunkEvent)}`  // 終端の \n\n がない
       const chunk = encoder.encode(partialEventData)

@@ -1,19 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { DifyStreamProcessor, createStreamProcessor, type StreamProcessor } from '../difyStreamProcessor'
-import * as difyStreamParser from '../difyStreamParser'
-import * as difyEventHandler from '../difyEventHandler'
+import { BaseStreamProcessor, createStreamProcessor } from '../stream/streamProcessor'
+import type { StreamProcessor } from '../../../types/api'
+import * as streamParser from '../stream/streamParser'
+import * as eventHandlerRegistry from '../stream/eventHandlerRegistry'
 import type { StreamingEventData, TextChunkEvent, NodeFinishedEvent, WorkflowFinishedEvent } from '../../../types'
 
 // モジュールのモック
-vi.mock('../difyStreamParser', () => ({
+vi.mock('../stream/streamParser', () => ({
   createStreamParser: vi.fn()
 }))
 
-vi.mock('../difyEventHandler', () => ({
-  createEventHandler: vi.fn()
+vi.mock('../stream/eventHandlerRegistry', () => ({
+  createEventHandlerRegistry: vi.fn()
 }))
 
-describe('DifyStreamProcessor', () => {
+describe('StreamProcessor', () => {
   // テスト用のモックデータ
   const mockTextChunkEvent: TextChunkEvent = {
     event: 'text_chunk',
@@ -61,8 +62,10 @@ describe('DifyStreamProcessor', () => {
     getBuffer: vi.fn()
   }
   
-  const mockEventHandler = {
-    handleEvent: vi.fn()
+  const mockEventHandlerRegistry = {
+    registerHandler: vi.fn(),
+    handleEvent: vi.fn(),
+    resetSession: vi.fn()
   }
 
   // テスト前の準備
@@ -71,41 +74,41 @@ describe('DifyStreamProcessor', () => {
     vi.clearAllMocks()
     
     // モックの設定
-    vi.mocked(difyStreamParser.createStreamParser).mockReturnValue(mockStreamParser)
-    vi.mocked(difyEventHandler.createEventHandler).mockReturnValue(mockEventHandler)
+    vi.mocked(streamParser.createStreamParser).mockReturnValue(mockStreamParser)
+    vi.mocked(eventHandlerRegistry.createEventHandlerRegistry).mockReturnValue(mockEventHandlerRegistry)
   })
 
   // テスト1: インスタンス化のテスト
   describe('インスタンス化', () => {
     it('デフォルトオプションでインスタンス化できること', () => {
-      const processor = new DifyStreamProcessor()
-      expect(processor).toBeInstanceOf(DifyStreamProcessor)
+      const processor = new BaseStreamProcessor()
+      expect(processor).toBeInstanceOf(BaseStreamProcessor)
     })
 
     it('デバッグオプションを有効にしてインスタンス化できること', () => {
-      const processor = new DifyStreamProcessor({ debug: true })
-      expect(processor).toBeInstanceOf(DifyStreamProcessor)
+      const processor = new BaseStreamProcessor({ debug: true })
+      expect(processor).toBeInstanceOf(BaseStreamProcessor)
     })
 
     it('カスタムパーサーとハンドラーでインスタンス化できること', () => {
-      const processor = new DifyStreamProcessor({}, mockStreamParser, mockEventHandler)
-      expect(processor).toBeInstanceOf(DifyStreamProcessor)
+      const processor = new BaseStreamProcessor({}, mockStreamParser, mockEventHandlerRegistry)
+      expect(processor).toBeInstanceOf(BaseStreamProcessor)
     })
 
     it('createStreamProcessor関数でインスタンスを作成できること', () => {
       const processor = createStreamProcessor()
-      expect(processor).toBeInstanceOf(DifyStreamProcessor)
+      expect(processor).toBeInstanceOf(BaseStreamProcessor)
     })
   })
 
   // テスト2: processStreamメソッドのテスト
   describe('processStream', () => {
-    let processor: DifyStreamProcessor
+    let processor: BaseStreamProcessor
     let onChunkMock: any
     let mockReader: any
 
     beforeEach(() => {
-      processor = new DifyStreamProcessor({}, mockStreamParser, mockEventHandler)
+      processor = new BaseStreamProcessor({}, mockStreamParser, mockEventHandlerRegistry)
       onChunkMock = vi.fn()
       
       // ReadableStreamDefaultReaderのモック
@@ -114,7 +117,7 @@ describe('DifyStreamProcessor', () => {
       }
       
       // イベントハンドラーのモック設定
-      mockEventHandler.handleEvent.mockImplementation((eventData, onChunk, accumulatedText, lastContent) => {
+      mockEventHandlerRegistry.handleEvent.mockImplementation((eventData, onChunk, state) => {
         if (eventData.event === 'text_chunk') {
           const expectedChunk = JSON.stringify({
             type: 'legacy',
@@ -122,8 +125,11 @@ describe('DifyStreamProcessor', () => {
           })
           onChunk(expectedChunk, false)
           return {
-            accumulatedText: accumulatedText + (eventData as TextChunkEvent).data.text,
-            lastContent: expectedChunk
+            state: {
+              accumulatedText: state.accumulatedText + (eventData as TextChunkEvent).data.text,
+              lastContent: expectedChunk
+            },
+            handled: true
           }
         } else if (eventData.event === 'node_finished') {
           const expectedChunk = JSON.stringify({
@@ -132,11 +138,17 @@ describe('DifyStreamProcessor', () => {
           })
           onChunk(expectedChunk, false)
           return {
-            accumulatedText: '',
-            lastContent: expectedChunk
+            state: {
+              accumulatedText: '',
+              lastContent: expectedChunk
+            },
+            handled: true
           }
         }
-        return { accumulatedText, lastContent }
+        return {
+          state,
+          handled: false
+        }
       })
     })
 
@@ -162,11 +174,10 @@ describe('DifyStreamProcessor', () => {
       
       expect(mockReader.read).toHaveBeenCalledTimes(2)
       expect(mockStreamParser.parseChunk).toHaveBeenCalledTimes(1)
-      expect(mockEventHandler.handleEvent).toHaveBeenCalledWith(
+      expect(mockEventHandlerRegistry.handleEvent).toHaveBeenCalledWith(
         mockTextChunkEvent,
         onChunkMock,
-        '',
-        ''
+        { accumulatedText: '', lastContent: '' }
       )
       
       const expectedChunk = JSON.stringify({
@@ -189,7 +200,7 @@ describe('DifyStreamProcessor', () => {
       
       expect(mockReader.read).toHaveBeenCalledTimes(2)
       expect(mockStreamParser.parseChunk).toHaveBeenCalledTimes(1)
-      expect(mockEventHandler.handleEvent).toHaveBeenCalledTimes(2)
+      expect(mockEventHandlerRegistry.handleEvent).toHaveBeenCalledTimes(2)
       expect(onChunkMock).toHaveBeenCalledTimes(2)
     })
 
@@ -198,9 +209,12 @@ describe('DifyStreamProcessor', () => {
       mockStreamParser.parseChunk.mockReturnValueOnce([mockTextChunkEvent])
       
       // イベントハンドラーのモック設定を上書き
-      mockEventHandler.handleEvent.mockReturnValueOnce({
-        accumulatedText: 'テスト累積テキスト',
-        lastContent: 'テストテキスト'
+      mockEventHandlerRegistry.handleEvent.mockReturnValueOnce({
+        state: {
+          accumulatedText: 'テスト累積テキスト',
+          lastContent: 'テストテキスト'
+        },
+        handled: true
       })
       
       // 1回目の読み取りでチャンクを返し、2回目で完了を示す
