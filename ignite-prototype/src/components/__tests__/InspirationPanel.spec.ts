@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ref } from 'vue'
-import { fetchDifyInspirationStream } from '../../services/api/difyService'
+import { fetchDifyInspirationStream } from '../../services/api/dify/difyService'
 import { createMarkdownStreamRenderer } from '../../services/api/markdownStreamRenderer'
 
 // モジュールのモック
-vi.mock('../../services/api/difyService', () => ({
+vi.mock('../../services/api/dify/difyService', () => ({
   fetchDifyInspirationStream: vi.fn()
 }))
 
@@ -32,12 +32,12 @@ describe('InspirationPanel機能テスト', () => {
     const mockRenderer = createMarkdownStreamRenderer()
     
     // fetchDifyInspirationStreamのモック実装
-    vi.mocked(fetchDifyInspirationStream).mockImplementation(async (lyrics, callback) => {
+    vi.mocked(fetchDifyInspirationStream).mockImplementation(async (lyrics, favoriteLyrics, onChunk) => {
       // 最初のチャンク
-      callback('新しいインスピレーション', false)
+      onChunk('新しいインスピレーション', false)
       
       // 最終チャンク（最終チャンクは前のチャンクを含む完全なテキスト）
-      callback('新しいインスピレーションの続き', true)
+      onChunk('新しいインスピレーションの続き', true)
     })
     
     // 更新関数の実装（InspirationPanelの実装を簡略化）
@@ -49,7 +49,7 @@ describe('InspirationPanel機能テスト', () => {
       mockRenderer.reset()
       
       // API呼び出し
-      await fetchDifyInspirationStream('', (chunk, isFinal) => {
+      await fetchDifyInspirationStream('', '', (chunk, isFinal) => {
         const result = mockRenderer.processChunk(chunk, !!isFinal)
         inspirationText.value = result.text
       })
@@ -69,12 +69,12 @@ describe('InspirationPanel機能テスト', () => {
     const mockRenderer = createMarkdownStreamRenderer()
     
     // fetchDifyInspirationStreamのモック実装
-    vi.mocked(fetchDifyInspirationStream).mockImplementation(async (lyrics, callback) => {
+    vi.mocked(fetchDifyInspirationStream).mockImplementation(async (lyrics, favoriteLyrics, onChunk) => {
       // 最初のチャンク
-      callback('新しいインスピレーション', false)
+      onChunk('新しいインスピレーション', false)
       
       // 最終チャンク（最終チャンクは前のチャンクを含む完全なテキスト）
-      callback('新しいインスピレーションの続き', true)
+      onChunk('新しいインスピレーションの続き', true)
     })
     
     // 更新関数の実装（期待される新しい実装）
@@ -87,7 +87,7 @@ describe('InspirationPanel機能テスト', () => {
       mockRenderer.reset()
       
       // API呼び出し
-      await fetchDifyInspirationStream('', (chunk, isFinal) => {
+      await fetchDifyInspirationStream('', '', (chunk, isFinal) => {
         const result = mockRenderer.processChunk(chunk, !!isFinal)
         
         // 既存のテキストに新しいテキストを追加
