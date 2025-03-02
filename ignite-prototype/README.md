@@ -75,3 +75,39 @@ npm run dev
 ### スタイル
 
 - `common.css`: 共通スタイル定義
+
+## デプロイ方法
+
+このプロジェクトはGitHub Pagesを使用してデプロイできるように設定されています。
+
+### GitHub Pagesへのデプロイ
+
+1. GitHubリポジトリにプッシュする前に、以下の設定が必要です：
+
+   - GitHub Secretsに環境変数を設定:
+     - `VITE_DIFY_API_KEY`: Dify APIキー
+     - `VITE_DIFY_API_BASE_URL`: Dify APIのベースURL
+
+2. リポジトリの「Settings」→「Secrets and variables」→「Actions」から、上記のシークレットを追加します。
+
+3. コードをGitHubリポジトリにプッシュすると、GitHub Actionsが自動的にビルドとデプロイを行います。
+
+4. デプロイが完了すると、`https://<ユーザー名>.github.io/IgnitePrototype/` でアプリケーションにアクセスできます。
+
+### 手動デプロイ
+
+ローカルでビルドして手動でデプロイする場合：
+
+1. ビルドを実行:
+
+```bash
+npm run build
+```
+
+2. `dist`ディレクトリの内容をWebサーバーにアップロードします。
+
+## 注意事項
+
+- このアプリケーションはフロントエンドのみで構成されており、APIキーはクライアントサイドで使用されます。
+- 公開リポジトリでは、APIキーを直接コミットしないように注意してください。
+- 本番環境では、APIキーの保護のためにプロキシサーバーの使用を検討してください。
