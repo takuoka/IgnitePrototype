@@ -38,7 +38,9 @@ describe('WorkflowFinishedEventHandler', () => {
       outputs: {
         advice: 'アドバイス内容',
         phrases: 'フレーズ内容',
-        words: 'キーワード内容'
+        words: 'キーワード内容',
+        lyric: '歌詞内容',
+        final_phrase: '最終フレーズ内容'
       },
       created_at: Date.now(),
       finished_at: Date.now()
