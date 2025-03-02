@@ -4,7 +4,7 @@
  * Dify APIから返されるストリームデータを解析する機能を提供します。
  */
 
-import { logError } from '@/utils/errorHandler';
+import { logError, getJsonParseErrorDetails } from '@/utils/errorHandler';
 import type { StreamingEventData } from '@/types';
 
 /**
@@ -97,7 +97,11 @@ export class DifyStreamParser implements StreamParser {
           const eventData = JSON.parse(jsonStr) as StreamingEventData;
           events.push(eventData);
         } catch (error) {
-          console.error('❌ [DifyStreamParser] JSONパースエラー:', error);
+          // 詳細なエラー情報を取得して出力
+          const errorDetails = getJsonParseErrorDetails(error, jsonStr);
+          console.error(`❌ [DifyStreamParser] ${errorDetails}`);
+          
+          // スタックトレースも出力
           logError('DifyStreamParser', error);
         }
       }
