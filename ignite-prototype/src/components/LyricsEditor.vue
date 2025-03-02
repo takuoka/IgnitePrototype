@@ -1,10 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import type { LyricsEditorInterface } from '@/types'
 
-const lyrics = ref('')
-const favoriteLyrics = ref('')
+// localStorageから初期値を読み込む
+const lyrics = ref(localStorage.getItem('lyrics') || '')
+const favoriteLyrics = ref(localStorage.getItem('favoriteLyrics') || '')
 const activeTab = ref('current') // 'current' or 'favorite'
+
+// 歌詞が変更されたらlocalStorageに保存
+watch(lyrics, (newValue) => {
+  localStorage.setItem('lyrics', newValue)
+})
+
+// お気に入り歌詞が変更されたらlocalStorageに保存
+watch(favoriteLyrics, (newValue) => {
+  localStorage.setItem('favoriteLyrics', newValue)
+})
 
 // Expose the interface for parent components
 defineExpose<LyricsEditorInterface>({
