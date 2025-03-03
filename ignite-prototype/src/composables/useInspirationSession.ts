@@ -2,7 +2,7 @@
  * インスピレーションセッション管理のコンポーザブル
  */
 import { ref, computed } from 'vue'
-import { fetchDifyInspirationStream } from '@/services/api/dify/difyService'
+import { fetchDifyInspirationStream, fetchDifyInspirationStreamLegacy } from '@/services/api'
 import { createEventHandlerRegistry } from '@/services/api/stream/eventHandlerRegistry'
 import { createApiErrorMessage, logError } from '@/utils/errorHandler'
 import { sessionsToMarkdown, markdownToHtml } from '@/utils/markdownConverter'
@@ -166,12 +166,14 @@ export function useInspirationSession() {
    * @param favoriteLyrics 好きな歌詞
    * @param onUpdate 更新時のコールバック
    * @param globalInstruction ユーザー指示
+   * @param apiName 使用するAPI名
    */
   const updateInspiration = async (
     lyrics: string = '', 
     favoriteLyrics: string = '', 
     onUpdate?: () => void,
-    globalInstruction: string = ''
+    globalInstruction: string = '',
+    apiName: string = 'default'
   ) => {
     try {
       isLoading.value = true
@@ -204,10 +206,21 @@ export function useInspirationSession() {
       // 処理済みタイプを追跡（重複防止）
       const processedTypes = new Set<string>()
       
+      // 入力データを準備
+      const inputs: Record<string, any> = {
+        currentLyric: lyrics || '歌詞を入力してください',
+        favorite_lyrics: favoriteLyrics
+      };
+
+      // ユーザー指示が存在する場合は追加
+      if (globalInstruction) {
+        inputs.global_instruction = globalInstruction;
+      }
+      
       // ストリーミングモードでAPI呼び出し
       await fetchDifyInspirationStream(
-        lyrics, 
-        favoriteLyrics, 
+        apiName,
+        inputs,
         (chunk: string, isWorkflowCompletion?: boolean) => {
           processChunk(chunk, !!isWorkflowCompletion, processedTypes)
           if (onUpdate) onUpdate()
@@ -216,8 +229,7 @@ export function useInspirationSession() {
           if (isWorkflowCompletion && processedTypes.size > 0) {
             isGenerating.value = false
           }
-        },
-        globalInstruction
+        }
       )
       
       // ストリーミングが終了しても最終結果が届いていない場合

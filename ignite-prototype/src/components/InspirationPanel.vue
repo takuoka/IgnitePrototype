@@ -7,6 +7,7 @@ const props = defineProps<{
   lyrics?: string
   favoriteLyrics?: string
   globalInstruction?: string
+  apiName?: string
 }>()
 
 const emit = defineEmits(['update'])
@@ -96,7 +97,8 @@ const handleUpdateInspiration = async () => {
     props.lyrics || '', 
     props.favoriteLyrics || '', 
     handleUpdate,
-    props.globalInstruction || ''
+    props.globalInstruction || '',
+    props.apiName || 'default'
   )
 }
 </script>

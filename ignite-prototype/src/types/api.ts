@@ -8,6 +8,31 @@
 import type { StreamingEventData } from './index';
 
 /**
+ * Dify API定義インターフェース
+ */
+export interface DifyApiDefinition {
+  /**
+   * APIの名前（キーと紐づく）
+   */
+  name: string;
+  
+  /**
+   * APIキーの環境変数名
+   */
+  apiKeyEnvName: string;
+  
+  /**
+   * 有効な入力変数（既存の変数名と紐づく）
+   */
+  validInputVariables: string[];
+  
+  /**
+   * 出力変数
+   */
+  outputVariables: string[];
+}
+
+/**
  * API設定インターフェース
  */
 export interface ApiConfig {

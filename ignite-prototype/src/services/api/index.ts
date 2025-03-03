@@ -5,10 +5,13 @@
  */
 
 // Dify APIサービスをエクスポート
-export { fetchDifyInspirationStream } from './dify/difyService';
+export { fetchDifyInspirationStream, fetchDifyInspirationStreamLegacy } from './dify/difyService';
 
 // APIクライアント
-export { createDifyClient } from './dify/difyClient';
+export { createDifyClient, getDifyConfig } from './dify/difyClient';
+
+// APIレジストリ
+export { apiRegistry } from './core/apiRegistry';
 
 // ストリーム処理
 export { createDifyStreamProcessor } from './dify/difyStreamProcessor';
