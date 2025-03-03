@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch, onUnmounted } from 'vue'
 import { useInspirationSession } from '@/composables/useInspirationSession'
+import { apiRegistry } from '@/services/api'
 
 // Props and emits
 const props = defineProps<{
@@ -23,6 +24,12 @@ const {
 
 // マークダウンコンテンツへの参照
 const markdownContentRef = ref<HTMLElement | null>(null)
+
+// 選択されたAPI名
+const selectedApiName = ref(props.apiName || 'default')
+
+// 利用可能なAPI定義のリスト
+const availableApis = apiRegistry.getAllApiDefinitions()
 
 // 自動スクロールの制御
 const autoScrollEnabled = ref(true)
@@ -98,7 +105,7 @@ const handleUpdateInspiration = async () => {
     props.favoriteLyrics || '', 
     handleUpdate,
     props.globalInstruction || '',
-    props.apiName || 'default'
+    selectedApiName.value
   )
 }
 </script>
@@ -112,6 +119,20 @@ const handleUpdateInspiration = async () => {
     ></div>
     
     <div class="button-container">
+      <select 
+        v-model="selectedApiName" 
+        class="api-selector"
+        title="API選択"
+      >
+        <option 
+          v-for="api in availableApis" 
+          :key="api.name" 
+          :value="api.name"
+        >
+          {{ api.name }}
+        </option>
+      </select>
+      
       <button 
         class="primary-button"
         @click="handleUpdateInspiration"
@@ -147,6 +168,16 @@ const handleUpdateInspiration = async () => {
   display: flex;
   align-items: center;
   margin-top: 1.2rem;
+}
+
+.api-selector {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  margin-right: 1rem;
+  font-size: 0.9rem;
+  min-width: 120px;
 }
 
 .primary-button {

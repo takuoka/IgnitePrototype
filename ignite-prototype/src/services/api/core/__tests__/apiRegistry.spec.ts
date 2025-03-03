@@ -53,26 +53,26 @@ describe('ApiRegistry', () => {
   });
   
   it('should get default API definition', () => {
-    // 最初に登録されたAPIがデフォルトになる
-    const api1: DifyApiDefinition = {
-      name: 'api1',
-      apiKeyEnvName: 'VITE_API1_KEY',
+    // 'default'という名前のAPIがデフォルトになる
+    const defaultApi: DifyApiDefinition = {
+      name: 'default',
+      apiKeyEnvName: 'VITE_DEFAULT_API_KEY',
       validInputVariables: ['input1'],
       outputVariables: ['output1']
     };
     
-    const api2: DifyApiDefinition = {
-      name: 'api2',
-      apiKeyEnvName: 'VITE_API2_KEY',
+    const otherApi: DifyApiDefinition = {
+      name: 'other',
+      apiKeyEnvName: 'VITE_OTHER_API_KEY',
       validInputVariables: ['input2'],
       outputVariables: ['output2']
     };
     
-    registry.registerApi(api1);
-    registry.registerApi(api2);
+    registry.registerApi(otherApi);
+    registry.registerApi(defaultApi);
     
-    const defaultApi = registry.getDefaultApiDefinition();
-    expect(defaultApi).toEqual(api1);
+    const result = registry.getDefaultApiDefinition();
+    expect(result).toEqual(defaultApi);
   });
   
   it('should return undefined as default when no APIs are registered', () => {
